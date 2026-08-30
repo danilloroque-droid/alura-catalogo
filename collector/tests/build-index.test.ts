@@ -46,7 +46,12 @@ describe('construirIndice', () => {
   });
 
   it('serializa as chaves de cada item sempre na mesma ordem', () => {
-    const texto = serializar(construirIndice([fonte([item('a')])], '2026-08-29T00:00:00Z'));
+    // Criar um item com chaves fora de ordem para forçar ordenarChaves a trabalhar
+    const itemComChavesDesordenadas = Object.fromEntries(
+      Object.entries(item('a')).reverse(),
+    ) as unknown as ItemCatalogo;
+
+    const texto = serializar(construirIndice([fonte([itemComChavesDesordenadas])], '2026-08-29T00:00:00Z'));
     const primeiro = JSON.parse(texto).itens[0];
     expect(Object.keys(primeiro)[0]).toBe('id');
     expect(Object.keys(primeiro)[1]).toBe('plataforma');
