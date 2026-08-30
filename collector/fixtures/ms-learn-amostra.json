@@ -1,0 +1,95 @@
+{
+  "modules": [
+    {
+      "uid": "learn.wwl.experiment-azure-machine-learning",
+      "title": "Experimente com o Azure Machine Learning",
+      "summary": "Escolha este módulo se quiser comparar modelos usando o machine learning automatizado.",
+      "url": "https://learn.microsoft.com/pt-br/training/modules/experiment-azure-machine-learning/",
+      "duration_in_minutes": 65,
+      "levels": ["beginner"],
+      "roles": ["data-scientist"],
+      "products": ["azure-machine-learning"],
+      "subjects": ["machine-learning"],
+      "popularity": 0.5939815210230943,
+      "last_modified": "2026-08-27T22:13:00+00:00"
+    },
+    {
+      "uid": "learn.wwl.modulo-sem-subjects",
+      "title": "Módulo sem assunto declarado",
+      "summary": "Cobre o caso dos 728 módulos que não trazem subjects.",
+      "url": "https://learn.microsoft.com/pt-br/training/modules/sem-subjects/",
+      "duration_in_minutes": 30,
+      "levels": ["intermediate"],
+      "roles": ["security-engineer"],
+      "products": ["azure"],
+      "last_modified": "2026-07-01T10:00:00+00:00"
+    },
+    {
+      "uid": "learn.wwl.modulo-sem-popularidade",
+      "title": "Módulo sem popularidade",
+      "summary": "Cobre os 100 módulos com popularity ausente.",
+      "url": "https://learn.microsoft.com/pt-br/training/modules/sem-popularidade/",
+      "duration_in_minutes": 12,
+      "levels": ["advanced"],
+      "roles": ["developer"],
+      "products": ["dotnet"],
+      "subjects": ["backend-development"],
+      "last_modified": "2026-06-15T08:30:00+00:00"
+    }
+  ],
+  "learningPaths": [
+    {
+      "uid": "learn.wwl.trilha-sem-avaliacao",
+      "title": "Trilha sem avaliação",
+      "summary": "Cobre as 848 trilhas cujo rating tem count zero.",
+      "url": "https://learn.microsoft.com/pt-br/training/paths/sem-avaliacao/",
+      "duration_in_minutes": 300,
+      "levels": ["beginner"],
+      "roles": ["administrator"],
+      "products": ["azure"],
+      "subjects": ["cloud-computing"],
+      "popularity": 0.71,
+      "rating": { "count": 0 },
+      "last_modified": "2026-08-10T08:50:00+00:00"
+    },
+    {
+      "uid": "learn.wwl.trilha-avaliada",
+      "title": "Trilha avaliada",
+      "summary": "A única trilha com count maior que zero na coleta de referência.",
+      "url": "https://learn.microsoft.com/pt-br/training/paths/avaliada/",
+      "duration_in_minutes": 180,
+      "levels": ["intermediate"],
+      "roles": ["devops-engineer"],
+      "products": ["github"],
+      "subjects": ["devops"],
+      "popularity": 0.88,
+      "rating": { "count": 6, "average": 4.83 },
+      "last_modified": "2026-05-20T12:00:00+00:00"
+    }
+  ],
+  "courses": [
+    {
+      "uid": "course.gh-200t00",
+      "course_number": "GH-200T00",
+      "title": "Automatize o fluxo de trabalho com o GitHub Actions",
+      "summary": "<p>Saiba como <b>GitHub Actions</b> permite automatizar seu ciclo de desenvolvimento.</p>",
+      "url": "https://learn.microsoft.com/pt-br/training/courses/gh-200t00",
+      "duration_in_hours": 24,
+      "levels": ["intermediate"],
+      "roles": ["devops-engineer"],
+      "products": ["github"],
+      "last_modified": "2026-04-02T00:00:00+00:00"
+    }
+  ],
+  "certifications": [
+    {
+      "uid": "certification.azure-for-sap-workloads-specialty",
+      "title": "Microsoft Certified: Azure for SAP Workloads Specialty",
+      "subtitle": "<p>Você é um arquiteto que gerencia o cenário SAP em Azure.</p>\n<ul>\n<li>Migrações e integrações.</li>\n</ul>",
+      "url": "https://learn.microsoft.com/pt-br/credentials/certifications/azure-for-sap-workloads-specialty/",
+      "levels": ["advanced"],
+      "roles": ["solution-architect"],
+      "last_modified": "2026-03-11T09:00:00+00:00"
+    }
+  ]
+}
