@@ -117,6 +117,22 @@ describe('removerHtml', () => {
   it('converte entidades comuns', () => {
     expect(removerHtml('a &amp; b &lt;c&gt; &nbsp;d &quot;e&quot;')).toBe('a & b <c> d "e"');
   });
+
+  // A tabela nomeada cobre 6 entradas. Trocar o resto por espaco apagava o
+  // dado em silencio: "caf&eacute;" virava "caf" e nada registrava a perda.
+  it('preserva entidade nomeada desconhecida em vez de engoli-la', () => {
+    expect(removerHtml('caf&eacute; da manha')).toBe('caf&eacute; da manha');
+  });
+
+  it('decodifica entidade numerica decimal e hexadecimal', () => {
+    expect(removerHtml('Voc&#234; e &#x41;rquiteto')).toBe('Você e Arquiteto');
+  });
+
+  // fromCodePoint lanca RangeError acima de 0x10FFFF. Um resumo malformado
+  // nao pode derrubar uma coleta de 4667 itens.
+  it('preserva entidade numerica fora da faixa Unicode sem lancar', () => {
+    expect(removerHtml('a &#999999999; b')).toBe('a &#999999999; b');
+  });
 });
 
 describe('paraData', () => {

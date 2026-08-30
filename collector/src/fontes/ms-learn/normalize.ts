@@ -25,14 +25,35 @@ const ENTIDADES: Record<string, string> = {
   '&lt;': '<',
   '&gt;': '>',
   '&quot;': '"',
-  '&#39;': "'",
   '&nbsp;': ' ',
 };
+
+/**
+ * Decodifica uma entidade HTML. A tabela nomeada cobre so o que a API de fato
+ * devolve; entidade numerica e mecanicamente decodificavel e dispensa tabela.
+ * O que sobra volta intacto de proposito: trocar entidade desconhecida por
+ * espaco apagava caracteres em silencio ("caf&eacute;" virava "caf"), sem
+ * deixar rastro de que havia algo ali.
+ */
+function decodificarEntidade(entidade: string): string {
+  const nomeada = ENTIDADES[entidade.toLowerCase()];
+  if (nomeada !== undefined) return nomeada;
+
+  const [, hex, digitos] = /^&#(x?)([0-9a-f]+);$/i.exec(entidade) ?? [];
+  if (digitos !== undefined) {
+    const ponto = parseInt(digitos, hex ? 16 : 10);
+    // String.fromCodePoint lanca RangeError acima de 0x10FFFF. Um resumo
+    // malformado nao pode derrubar uma coleta de milhares de itens.
+    if (ponto <= 0x10ffff) return String.fromCodePoint(ponto);
+  }
+
+  return entidade;
+}
 
 export function removerHtml(texto: string): string {
   return texto
     .replace(/<[^>]*>/g, ' ')
-    .replace(/&[a-z#0-9]+;/gi, (e) => ENTIDADES[e.toLowerCase()] ?? ' ')
+    .replace(/&[a-z#0-9]+;/gi, decodificarEntidade)
     .replace(/\s+/g, ' ')
     .trim();
 }
