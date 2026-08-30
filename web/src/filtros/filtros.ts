@@ -2,6 +2,17 @@ import type { ItemCatalogo, Nivel, Plataforma, TipoItem } from '@compartilhado/t
 
 export type Ordem = 'titulo' | 'duracao' | 'atualizacao' | 'popularidade' | 'nota';
 
+/** Ordens cujo significado depende da escala, logo restritas a uma plataforma. */
+export type OrdemRestrita = 'popularidade' | 'nota';
+
+export type Permissoes = Record<OrdemRestrita, boolean>;
+
+const ORDENS_RESTRITAS: OrdemRestrita[] = ['popularidade', 'nota'];
+
+export function ehOrdemRestrita(ordem: Ordem): ordem is OrdemRestrita {
+  return (ORDENS_RESTRITAS as Ordem[]).includes(ordem);
+}
+
 export interface Criterios {
   texto: string;
   plataformas: Plataforma[];
@@ -85,6 +96,18 @@ export function ordenacaoPermitida(itens: ItemCatalogo[], ordem: Ordem): boolean
   if (ordem === 'nota') return escalaUnica(itens, 'nota', 'escalaNota');
   if (ordem === 'popularidade') return escalaUnica(itens, 'popularidade', 'escalaPopularidade');
   return true;
+}
+
+/**
+ * Responde de uma vez por todas as ordens restritas. A interface precisa das
+ * duas respostas juntas para desabilitar cada opcao do seletor; perguntar ordem
+ * a ordem espalharia a regra de escala pelos componentes.
+ */
+export function permissoesDe(itens: ItemCatalogo[]): Permissoes {
+  return {
+    nota: ordenacaoPermitida(itens, 'nota'),
+    popularidade: ordenacaoPermitida(itens, 'popularidade'),
+  };
 }
 
 function porNumero(valor: number | null): number {

@@ -1,5 +1,6 @@
 import type { Indice, Nivel, TipoItem } from '@compartilhado/types';
-import type { Criterios, Ordem } from '../filtros/filtros.js';
+import type { Criterios, Ordem, OrdemRestrita, Permissoes } from '../filtros/filtros.js';
+import { ehOrdemRestrita } from '../filtros/filtros.js';
 import { CRITERIOS_VAZIOS } from '../filtros/url.js';
 
 const TIPOS: { id: TipoItem; nome: string }[] = [
@@ -23,10 +24,19 @@ const ORDENS: { id: Ordem; nome: string }[] = [
   { id: 'nota', nome: 'Nota' },
 ];
 
+const AVISOS: Record<OrdemRestrita, string> = {
+  nota:
+    'Ordenar por nota exige uma única plataforma: Alura e Microsoft Learn usam ' +
+    'escalas diferentes, e compará-las não significaria nada. Ordenando por título.',
+  popularidade:
+    'Ordenar por popularidade exige uma única plataforma: a Alura conta alunos ' +
+    'matriculados e o Microsoft Learn usa um índice de 0 a 1. Ordenando por título.',
+};
+
 interface Props {
   indice: Indice;
   criterios: Criterios;
-  notaPermitida: boolean;
+  permissoes: Permissoes;
   aoMudar: (c: Criterios) => void;
 }
 
@@ -34,7 +44,7 @@ function alternar<T>(lista: T[], valor: T): T[] {
   return lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor];
 }
 
-export function PainelFiltros({ indice, criterios, notaPermitida, aoMudar }: Props) {
+export function PainelFiltros({ indice, criterios, permissoes, aoMudar }: Props) {
   return (
     <aside className="filtros">
       <label className="campo">
@@ -112,17 +122,16 @@ export function PainelFiltros({ indice, criterios, notaPermitida, aoMudar }: Pro
           onChange={(e) => aoMudar({ ...criterios, ordem: e.target.value as Ordem })}
         >
           {ORDENS.map((o) => (
-            <option key={o.id} value={o.id} disabled={o.id === 'nota' && !notaPermitida}>
+            <option key={o.id} value={o.id} disabled={ehOrdemRestrita(o.id) && !permissoes[o.id]}>
               {o.nome}
             </option>
           ))}
         </select>
       </label>
 
-      {!notaPermitida && criterios.ordem === 'nota' && (
+      {ehOrdemRestrita(criterios.ordem) && !permissoes[criterios.ordem] && (
         <p className="aviso" role="status">
-          Ordenar por nota exige uma única plataforma: Alura e Microsoft Learn usam
-          escalas diferentes, e compará-las não significaria nada. Ordenando por título.
+          {AVISOS[criterios.ordem]}
         </p>
       )}
 

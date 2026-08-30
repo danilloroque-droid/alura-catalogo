@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Indice } from '@compartilhado/types';
-import { aplicar, filtrar, buscar, ordenacaoPermitida } from '../filtros/filtros.js';
+import { aplicar, filtrar, buscar, permissoesDe } from '../filtros/filtros.js';
 import { deHash, paraHash } from '../filtros/url.js';
 import { PainelFiltros } from '../componentes/PainelFiltros.js';
 import { ListaItens } from '../componentes/ListaItens.js';
@@ -22,9 +22,10 @@ export function Catalogo({ indice }: { indice: Indice }) {
 
   const resultados = useMemo(() => aplicar(indice.itens, criterios), [indice.itens, criterios]);
 
-  // A permissao depende do conjunto filtrado, nao do catalogo inteiro.
-  const notaPermitida = useMemo(
-    () => ordenacaoPermitida(filtrar(buscar(indice.itens, criterios.texto), criterios), 'nota'),
+  // A permissao depende do conjunto filtrado, nao do catalogo inteiro:
+  // estreitar para uma unica plataforma volta a liberar nota e popularidade.
+  const permissoes = useMemo(
+    () => permissoesDe(filtrar(buscar(indice.itens, criterios.texto), criterios)),
     [indice.itens, criterios],
   );
 
@@ -33,7 +34,7 @@ export function Catalogo({ indice }: { indice: Indice }) {
       <PainelFiltros
         indice={indice}
         criterios={criterios}
-        notaPermitida={notaPermitida}
+        permissoes={permissoes}
         aoMudar={setCriterios}
       />
       <section className="resultados">

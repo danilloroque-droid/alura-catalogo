@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   aplicar, buscar, comparadorDe, filtrar, normalizarTexto, ordenar, ordenacaoPermitida,
+  permissoesDe,
   type Ordem,
   type Criterios,
 } from '../src/filtros/filtros.js';
@@ -209,5 +210,22 @@ describe('aplicar', () => {
       item({ id: 'b', titulo: 'Alfa', plataforma: 'alura', nota: 9.4, escalaNota: 'alura-nps' }),
     ];
     expect(aplicar(itens, { ...VAZIO, ordem: 'nota' }).map((i) => i.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('permissoesDe', () => {
+  // A interface precisa das duas respostas de uma vez para desabilitar cada
+  // opcao do seletor; perguntar ordem a ordem espalharia a regra pela UI.
+  it('responde as duas ordens restritas numa passada', () => {
+    const itens = [
+      item({ id: 'a', nota: 4.8, escalaNota: 'ms-rating', popularidade: 0.9, escalaPopularidade: 'ms-popularity' }),
+      item({ id: 'b', plataforma: 'alura', nota: 4.7, escalaNota: 'ms-rating', popularidade: 12000, escalaPopularidade: 'alura-alunos' }),
+    ];
+    expect(permissoesDe(itens)).toEqual({ nota: true, popularidade: false });
+  });
+
+  it('libera as duas quando nada se mistura', () => {
+    const itens = [item({ id: 'a', nota: 4.8, escalaNota: 'ms-rating' })];
+    expect(permissoesDe(itens)).toEqual({ nota: true, popularidade: true });
   });
 });

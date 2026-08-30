@@ -102,4 +102,55 @@ describe('Catalogo', () => {
     // persistiria e os 100 itens filtrados apareceriam de uma vez.
     expect(screen.getAllByRole('article')).toHaveLength(60);
   });
+
+  // Popularidade sofre do mesmo problema de escala que nota, e ate a fix wave
+  // a recusa existia em aplicar() mas nao aparecia na interface: a ordem caia
+  // para titulo em silencio.
+  it('explica por que ordenar por popularidade fica indisponivel com plataformas misturadas', () => {
+    const misto: Indice = {
+      ...indice,
+      itens: [
+        item('a', { popularidade: 0.9, escalaPopularidade: 'ms-popularity' }),
+        item('b', { plataforma: 'alura', popularidade: 12000, escalaPopularidade: 'alura-alunos' }),
+      ],
+    };
+    window.location.hash = '#/?ordem=popularidade';
+    render(<Catalogo indice={misto} />);
+    expect(screen.getByText(/alunos matriculados/i)).toBeDefined();
+  });
+
+  it('desabilita no seletor apenas a ordem cuja escala se mistura', () => {
+    const misto: Indice = {
+      ...indice,
+      itens: [
+        item('a', { popularidade: 0.9, escalaPopularidade: 'ms-popularity', nota: 4.8, escalaNota: 'ms-rating' }),
+        item('b', { plataforma: 'alura', popularidade: 12000, escalaPopularidade: 'alura-alunos', nota: 4.7, escalaNota: 'ms-rating' }),
+      ],
+    };
+    render(<Catalogo indice={misto} />);
+    const opcao = (nome: string) => screen.getByRole('option', { name: nome }) as HTMLOptionElement;
+    // Popularidade mistura ms-popularity com alura-alunos; nota esta em
+    // ms-rating dos dois lados, entao segue comparavel.
+    expect(opcao('Popularidade').disabled).toBe(true);
+    expect(opcao('Nota').disabled).toBe(false);
+    expect(opcao('Título').disabled).toBe(false);
+  });
+
+  // A permissao e do conjunto filtrado, nao do catalogo: estreitar para uma
+  // unica plataforma devolve o sentido a escala e a ordem volta a valer.
+  it('libera de novo a ordem restrita quando o filtro estreita para uma plataforma', () => {
+    const misto: Indice = {
+      ...indice,
+      itens: [
+        item('a', { popularidade: 0.9, escalaPopularidade: 'ms-popularity' }),
+        item('b', { plataforma: 'alura', popularidade: 12000, escalaPopularidade: 'alura-alunos' }),
+      ],
+    };
+    window.location.hash = '#/?ordem=popularidade&plat=ms-learn';
+    render(<Catalogo indice={misto} />);
+
+    expect(screen.queryByText(/alunos matriculados/i)).toBeNull();
+    const opcao = screen.getByRole('option', { name: 'Popularidade' }) as HTMLOptionElement;
+    expect(opcao.disabled).toBe(false);
+  });
 });
