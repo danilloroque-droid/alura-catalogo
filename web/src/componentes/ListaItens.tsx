@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ItemCatalogo } from '@compartilhado/types';
 import { CartaoItem } from './CartaoItem.js';
 
@@ -9,12 +9,12 @@ interface Props {
   porPagina?: number;
 }
 
+// A paginacao e estado local deste componente: ela nao observa mudancas em
+// `itens`. Para voltar ao topo quando os criterios de filtro mudam, quem usa
+// este componente deve remonta-lo com uma `key` derivada dos criterios
+// (ex.: `<ListaItens key={paraHash(criterios)} ... />`).
 export function ListaItens({ itens, porPagina = POR_PAGINA }: Props) {
   const [visiveis, setVisiveis] = useState(porPagina);
-
-  // Trocar de filtro precisa recomecar do topo, senao o usuario ve o fim de
-  // uma lista que ele nunca rolou.
-  useEffect(() => { setVisiveis(porPagina); }, [itens, porPagina]);
 
   if (itens.length === 0) {
     return <p className="vazio">Nenhum item encontrado. Tente afrouxar os filtros.</p>;

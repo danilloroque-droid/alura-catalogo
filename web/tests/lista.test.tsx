@@ -48,10 +48,20 @@ describe('ListaItens', () => {
     expect(screen.queryByRole('button', { name: /mostrar mais/i })).toBeNull();
   });
 
-  it('volta para a primeira pagina quando a lista muda', async () => {
+  it('mantem a pagina atual quando a lista muda mas a key nao muda', async () => {
     const { rerender } = render(<ListaItens itens={muitos} porPagina={10} />);
     await userEvent.click(screen.getByRole('button', { name: /mostrar mais/i }));
-    rerender(<ListaItens itens={muitos.slice(0, 15)} porPagina={10} />);
+    expect(screen.getAllByRole('article')).toHaveLength(20);
+    const outros = Array.from({ length: 25 }, (_, i) => item(`x${i}`));
+    rerender(<ListaItens itens={outros} porPagina={10} />);
+    expect(screen.getAllByRole('article')).toHaveLength(20);
+  });
+
+  it('volta para a primeira pagina quando a key muda (remontagem)', async () => {
+    const { rerender } = render(<ListaItens key="a" itens={muitos} porPagina={10} />);
+    await userEvent.click(screen.getByRole('button', { name: /mostrar mais/i }));
+    expect(screen.getAllByRole('article')).toHaveLength(20);
+    rerender(<ListaItens key="b" itens={muitos} porPagina={10} />);
     expect(screen.getAllByRole('article')).toHaveLength(10);
   });
 
