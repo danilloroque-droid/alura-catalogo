@@ -120,6 +120,18 @@ describe('ordenar', () => {
     expect(resultado.slice(2)).toContain('d');
   });
 
+  // O teste antigo usava Alfa e Beta, que ordenam igual sob comparacao ingenua.
+  // Este exige colacao de verdade: A com acento e U+00C1, depois de Z na tabela
+  // de codigo, entao comparacao por codepoint poria Abaco no fim.
+  it('ordena por titulo pela colacao pt-BR, nao pela tabela de codigo', () => {
+    const acentuados = [
+      item({ id: 'c', titulo: 'Azul' }),
+      item({ id: 'a', titulo: 'Ábaco' }),
+      item({ id: 'b', titulo: 'Alfa' }),
+    ];
+    expect(ordenar(acentuados, 'titulo').map((i) => i.id)).toEqual(['a', 'b', 'c']);
+  });
+
   it('nao muta o array recebido', () => {
     const original = [...itens];
     ordenar(itens, 'titulo');
