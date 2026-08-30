@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  aplicar, buscar, filtrar, normalizarTexto, ordenar, ordenacaoPermitida,
+  aplicar, buscar, comparadorDe, filtrar, normalizarTexto, ordenar, ordenacaoPermitida,
+  type Ordem,
   type Criterios,
 } from '../src/filtros/filtros.js';
 import type { ItemCatalogo } from '@compartilhado/types';
@@ -111,8 +112,7 @@ describe('ordenar', () => {
       item({ id: 'c', duracaoMinutos: 30 }),
       item({ id: 'd', duracaoMinutos: null }),
     ];
-    // Todos os nulos devem ir para o fim, e a ordem entre eles nao importa
-    // (desde que o comparador seja consistente: compare(x, x) === 0)
+    // Todos os nulos devem ir para o fim, e a ordem entre eles nao importa.
     const resultado = ordenar(variosNulos, 'duracao').map((i) => i.id);
     expect(resultado.slice(0, 2)).toEqual(['c', 'a']);
     expect(resultado.slice(2)).toContain('b');
@@ -123,6 +123,33 @@ describe('ordenar', () => {
     const original = [...itens];
     ordenar(itens, 'titulo');
     expect(itens).toEqual(original);
+  });
+});
+
+describe('comparadorDe', () => {
+  const ORDENS: Ordem[] = ['titulo', 'duracao', 'atualizacao', 'popularidade', 'nota'];
+
+  // Array.prototype.sort so garante um resultado estavel se o comparador for
+  // consistente: compare(x, x) tem de ser 0. Como valor ausente vira sentinela
+  // infinita, a subtracao direta devolve Infinity - Infinity = NaN para dois
+  // itens sem valor, e a ordem final passa a depender do motor, nao do codigo.
+  it('devolve 0 ao comparar um item consigo mesmo, em qualquer ordem', () => {
+    const cheio = item({
+      id: 'a', duracaoMinutos: 90, nota: 4.8, escalaNota: 'ms-rating',
+      popularidade: 0.7, escalaPopularidade: 'ms-popularity',
+    });
+    for (const ordem of ORDENS) {
+      expect(comparadorDe(ordem)(cheio, cheio)).toBe(0);
+    }
+  });
+
+  it('devolve 0 ao comparar dois itens sem valor, nunca NaN', () => {
+    const semValor = { titulo: 'x', duracaoMinutos: null, atualizadoEm: null, nota: null, popularidade: null };
+    const a = item({ id: 'a', ...semValor });
+    const b = item({ id: 'b', ...semValor });
+    for (const ordem of ORDENS) {
+      expect(comparadorDe(ordem)(a, b)).toBe(0);
+    }
   });
 });
 
@@ -142,6 +169,26 @@ describe('ordenacaoPermitida', () => {
   it('permite as demais ordenacoes mesmo misturando plataformas', () => {
     expect(ordenacaoPermitida([ms, alura], 'titulo')).toBe(true);
     expect(ordenacaoPermitida([ms, alura], 'duracao')).toBe(true);
+  });
+
+  // Popularidade sofre do mesmo problema que nota: o Microsoft Learn devolve um
+  // indice de 0 a 1 e a Alura conta alunos matriculados. Ordenar as duas juntas
+  // coloca uma plataforma inteira acima da outra por unidade, nao por merito.
+  const msPop = item({ id: 'c', popularidade: 0.9, escalaPopularidade: 'ms-popularity' });
+  const aluraPop = item({ id: 'd', plataforma: 'alura', popularidade: 12000, escalaPopularidade: 'alura-alunos' });
+
+  it('permite ordenar por popularidade dentro de uma unica escala', () => {
+    expect(ordenacaoPermitida([msPop], 'popularidade')).toBe(true);
+    expect(ordenacaoPermitida([aluraPop], 'popularidade')).toBe(true);
+  });
+
+  it('proibe ordenar por popularidade misturando escalas incompativeis', () => {
+    expect(ordenacaoPermitida([msPop, aluraPop], 'popularidade')).toBe(false);
+  });
+
+  it('ignora itens sem valor ao decidir se as escalas se misturam', () => {
+    const semPopularidade = item({ id: 'e', plataforma: 'alura', popularidade: null, escalaPopularidade: null });
+    expect(ordenacaoPermitida([msPop, semPopularidade], 'popularidade')).toBe(true);
   });
 });
 

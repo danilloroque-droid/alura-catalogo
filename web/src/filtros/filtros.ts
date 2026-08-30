@@ -23,12 +23,27 @@ export function normalizarTexto(texto: string): string {
     .trim();
 }
 
+// Normalizar titulo + resumo custa NFD, regex e lowercase. Sem memoizacao isso
+// se repete sobre o catalogo inteiro a cada tecla digitada, e o custo aparece
+// como travamento na busca. O WeakMap guarda o alvo ja normalizado por item e
+// nao impede a coleta de lixo: quando o indice sai de cena, os alvos vao junto.
+const alvos = new WeakMap<ItemCatalogo, string>();
+
+function alvoDe(item: ItemCatalogo): string {
+  let alvo = alvos.get(item);
+  if (alvo === undefined) {
+    alvo = normalizarTexto(`${item.titulo} ${item.resumo ?? ''}`);
+    alvos.set(item, alvo);
+  }
+  return alvo;
+}
+
 export function buscar(itens: ItemCatalogo[], texto: string): ItemCatalogo[] {
   const termos = normalizarTexto(texto).split(' ').filter(Boolean);
   if (termos.length === 0) return itens;
 
   return itens.filter((item) => {
-    const alvo = normalizarTexto(`${item.titulo} ${item.resumo ?? ''}`);
+    const alvo = alvoDe(item);
     return termos.every((termo) => alvo.includes(termo));
   });
 }
@@ -49,15 +64,27 @@ export function filtrar(itens: ItemCatalogo[], criterios: Criterios): ItemCatalo
   });
 }
 
+function escalaUnica(
+  itens: ItemCatalogo[],
+  valor: 'nota' | 'popularidade',
+  escala: 'escalaNota' | 'escalaPopularidade',
+): boolean {
+  const escalas = new Set(itens.filter((i) => i[valor] !== null).map((i) => i[escala]));
+  return escalas.size <= 1;
+}
+
 /**
- * Notas de plataformas diferentes vem de escalas incompativeis: NPS de 0 a 10
- * na Alura, media de 0 a 5 no Microsoft Learn. Ordenar as duas juntas produz
- * um ranking sem significado, entao a operacao e recusada.
+ * Nota e popularidade sao numeros que so significam algo dentro da sua escala:
+ * NPS de 0 a 10 na Alura contra media de 0 a 5 no Microsoft Learn; contagem de
+ * alunos na Alura contra um `popularity` de 0 a 1 no Microsoft Learn. Ordenar
+ * escalas diferentes juntas produz um ranking sem significado — colocaria toda
+ * a Alura acima de todo o Microsoft Learn, ou o contrario —, entao a operacao
+ * e recusada (spec 5.1 e 9.4). As demais ordens nao dependem de escala.
  */
 export function ordenacaoPermitida(itens: ItemCatalogo[], ordem: Ordem): boolean {
-  if (ordem !== 'nota') return true;
-  const escalas = new Set(itens.filter((i) => i.nota !== null).map((i) => i.escalaNota));
-  return escalas.size <= 1;
+  if (ordem === 'nota') return escalaUnica(itens, 'nota', 'escalaNota');
+  if (ordem === 'popularidade') return escalaUnica(itens, 'popularidade', 'escalaPopularidade');
+  return true;
 }
 
 function porNumero(valor: number | null): number {
@@ -68,24 +95,32 @@ function porDuracao(valor: number | null): number {
   return valor === null ? Number.POSITIVE_INFINITY : valor;
 }
 
-export function ordenar(itens: ItemCatalogo[], ordem: Ordem): ItemCatalogo[] {
-  const copia = [...itens];
+// Subtracao pura quebra quando os dois lados caem na sentinela infinita:
+// Infinity - Infinity e NaN, e um comparador que devolve NaN viola o contrato
+// de Array.sort. A igualdade explicita garante compare(x, x) === 0 sempre.
+function comparar(x: number, y: number): number {
+  return x === y ? 0 : x - y;
+}
 
-  switch (ordem) {
-    case 'titulo':
-      return copia.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
-    case 'duracao':
-      // Crescente, mas sem duracao vai para o fim: um item sem informacao nao
-      // e "o mais curto". Usa POSITIVE_INFINITY para garantir consistencia:
-      // compare(null, null) === 0.
-      return copia.sort((a, b) => porDuracao(a.duracaoMinutos) - porDuracao(b.duracaoMinutos));
-    case 'atualizacao':
-      return copia.sort((a, b) => (b.atualizadoEm ?? '').localeCompare(a.atualizadoEm ?? ''));
-    case 'popularidade':
-      return copia.sort((a, b) => porNumero(b.popularidade) - porNumero(a.popularidade));
-    case 'nota':
-      return copia.sort((a, b) => porNumero(b.nota) - porNumero(a.nota));
-  }
+export type Comparador = (a: ItemCatalogo, b: ItemCatalogo) => number;
+
+const COMPARADORES: Record<Ordem, Comparador> = {
+  titulo: (a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'),
+  // Crescente, mas sem duracao vai para o fim: um item sem informacao nao e
+  // "o mais curto".
+  duracao: (a, b) => comparar(porDuracao(a.duracaoMinutos), porDuracao(b.duracaoMinutos)),
+  atualizacao: (a, b) => (b.atualizadoEm ?? '').localeCompare(a.atualizadoEm ?? ''),
+  popularidade: (a, b) => comparar(porNumero(b.popularidade), porNumero(a.popularidade)),
+  nota: (a, b) => comparar(porNumero(b.nota), porNumero(a.nota)),
+};
+
+/** Exposto para que o teste verifique diretamente que compare(x, x) === 0. */
+export function comparadorDe(ordem: Ordem): Comparador {
+  return COMPARADORES[ordem];
+}
+
+export function ordenar(itens: ItemCatalogo[], ordem: Ordem): ItemCatalogo[] {
+  return [...itens].sort(comparadorDe(ordem));
 }
 
 export function aplicar(itens: ItemCatalogo[], criterios: Criterios): ItemCatalogo[] {
