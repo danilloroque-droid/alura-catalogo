@@ -1,0 +1,56 @@
+name: Publicar site
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Permissoes minimas exigidas pelo deploy-pages: ler o codigo, escrever no
+# Pages e assinar o artefato com OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Uma publicacao por vez. Nao cancelamos a em andamento: interromper um deploy
+# no meio deixaria o site publicado pela metade.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Rodar os testes
+        run: npm test
+
+      - name: Construir o site
+        run: npm run build
+
+      - name: Configurar o Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar o artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Publicar
+        id: deploy
+        uses: actions/deploy-pages@v4
