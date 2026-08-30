@@ -118,6 +118,12 @@ describe('removerHtml', () => {
     expect(removerHtml('a &amp; b &lt;c&gt; &nbsp;d &quot;e&quot;')).toBe('a & b <c> d "e"');
   });
 
+  // Encontrado na coleta real: o titulo do modulo de Apple Messages traz
+  // Google&apos;s. Antes da guarda de entidades, virava "Google s" em silencio.
+  it('converte &apos;, que aparece no catalogo real', () => {
+    expect(removerHtml('Google&apos;s Business Messages')).toBe("Google's Business Messages");
+  });
+
   // A tabela nomeada cobre 6 entradas. Trocar o resto por espaco apagava o
   // dado em silencio: "caf&eacute;" virava "caf" e nada registrava a perda.
   it('preserva entidade nomeada desconhecida em vez de engoli-la', () => {

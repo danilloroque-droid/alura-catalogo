@@ -25,6 +25,7 @@ const ENTIDADES: Record<string, string> = {
   '&lt;': '<',
   '&gt;': '>',
   '&quot;': '"',
+  '&apos;': "'",
   '&nbsp;': ' ',
 };
 
