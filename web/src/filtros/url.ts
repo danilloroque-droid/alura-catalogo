@@ -7,6 +7,9 @@ export const CRITERIOS_VAZIOS: Criterios = {
 };
 
 const ORDENS: Ordem[] = ['titulo', 'duracao', 'atualizacao', 'popularidade', 'nota'];
+const PLATAFORMAS: Plataforma[] = ['ms-learn', 'alura'];
+const TIPOS: TipoItem[] = ['curso', 'modulo', 'trilha', 'certificacao'];
+const NIVEIS: Nivel[] = ['iniciante', 'intermediario', 'avancado'];
 
 export function paraHash(c: Criterios): string {
   const params = new URLSearchParams();
@@ -27,9 +30,27 @@ function lista(params: URLSearchParams, chave: string): string[] {
   return bruto ? bruto.split(',').filter(Boolean) : [];
 }
 
+function listaValidada<T extends string>(
+  params: URLSearchParams,
+  chave: string,
+  validos: readonly T[],
+): T[] {
+  const bruto = params.get(chave);
+  if (!bruto) return [];
+  return bruto
+    .split(',')
+    .filter(Boolean)
+    .filter((item): item is T => validos.includes(item as T));
+}
+
 export function deHash(hash: string): Criterios {
   const inicio = hash.indexOf('?');
-  if (inicio === -1) return { ...CRITERIOS_VAZIOS };
+  if (inicio === -1) {
+    return {
+      texto: '', plataformas: [], tipos: [], temas: [], niveis: [],
+      duracaoMaxima: null, ordem: 'titulo',
+    };
+  }
 
   const params = new URLSearchParams(hash.slice(inicio + 1));
   const ate = Number(params.get('ate'));
@@ -37,10 +58,10 @@ export function deHash(hash: string): Criterios {
 
   return {
     texto: params.get('q') ?? '',
-    plataformas: lista(params, 'plat') as Plataforma[],
-    tipos: lista(params, 'tipo') as TipoItem[],
+    plataformas: listaValidada(params, 'plat', PLATAFORMAS),
+    tipos: listaValidada(params, 'tipo', TIPOS),
     temas: lista(params, 'tema'),
-    niveis: lista(params, 'nivel') as Nivel[],
+    niveis: listaValidada(params, 'nivel', NIVEIS),
     duracaoMaxima: Number.isFinite(ate) && params.get('ate') ? ate : null,
     ordem: ordem && ORDENS.includes(ordem) ? ordem : 'titulo',
   };

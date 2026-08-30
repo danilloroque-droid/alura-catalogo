@@ -54,4 +54,34 @@ describe('deHash', () => {
     };
     expect(deHash(paraHash(original))).toEqual(original);
   });
+
+  it('descarta plataformas invalidas', () => {
+    const c = deHash('#/?plat=invalido');
+    expect(c.plataformas).toEqual([]);
+  });
+
+  it('descarta tipos invalidos', () => {
+    const c = deHash('#/?tipo=inventado');
+    expect(c.tipos).toEqual([]);
+  });
+
+  it('descarta niveis invalidos', () => {
+    const c = deHash('#/?nivel=desconhecido');
+    expect(c.niveis).toEqual([]);
+  });
+
+  it('mantém apenas valores validos em listas mistas', () => {
+    const c = deHash('#/?tipo=modulo,inventado,trilha&plat=ms-learn,invalido');
+    expect(c.tipos).toEqual(['modulo', 'trilha']);
+    expect(c.plataformas).toEqual(['ms-learn']);
+  });
+
+  it('retorna arrays novos em cada chamada para evitar compartilhamento', () => {
+    const c1 = deHash('');
+    const c2 = deHash('');
+    expect(c1.plataformas).not.toBe(c2.plataformas);
+    expect(c1.tipos).not.toBe(c2.tipos);
+    expect(c1.temas).not.toBe(c2.temas);
+    expect(c1.niveis).not.toBe(c2.niveis);
+  });
 });
