@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Indice } from '@compartilhado/types';
-import { aplicar, filtrar, buscar, permissoesDe } from '../filtros/filtros.js';
+import { encontrar, ordemEfetiva, ordenar, permissoesDe } from '../filtros/filtros.js';
 import { deHash, paraHash } from '../filtros/url.js';
 import { PainelFiltros } from '../componentes/PainelFiltros.js';
 import { ListaItens } from '../componentes/ListaItens.js';
@@ -20,13 +20,21 @@ export function Catalogo({ indice }: { indice: Indice }) {
     if (novo !== (window.location.hash || '#/')) window.location.hash = novo;
   }, [criterios]);
 
-  const resultados = useMemo(() => aplicar(indice.itens, criterios), [indice.itens, criterios]);
+  // Tanto a lista quanto as permissoes saem do mesmo conjunto buscado-e-
+  // filtrado. Uma fonte so, com nome, em vez de a pagina repetir a expressao
+  // que aplicar() ja tem por dentro.
+  const encontrados = useMemo(
+    () => encontrar(indice.itens, criterios),
+    [indice.itens, criterios],
+  );
 
   // A permissao depende do conjunto filtrado, nao do catalogo inteiro:
   // estreitar para uma unica plataforma volta a liberar nota e popularidade.
-  const permissoes = useMemo(
-    () => permissoesDe(filtrar(buscar(indice.itens, criterios.texto), criterios)),
-    [indice.itens, criterios],
+  const permissoes = useMemo(() => permissoesDe(encontrados), [encontrados]);
+
+  const resultados = useMemo(
+    () => ordenar(encontrados, ordemEfetiva(encontrados, criterios.ordem)),
+    [encontrados, criterios.ordem],
   );
 
   return (

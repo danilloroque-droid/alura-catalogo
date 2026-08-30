@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   aplicar, buscar, comparadorDe, filtrar, normalizarTexto, ordenar, ordenacaoPermitida,
-  permissoesDe,
+  permissoesDe, encontrar, ordemEfetiva,
   type Ordem,
   type Criterios,
 } from '../src/filtros/filtros.js';
@@ -227,5 +227,35 @@ describe('permissoesDe', () => {
   it('libera as duas quando nada se mistura', () => {
     const itens = [item({ id: 'a', nota: 4.8, escalaNota: 'ms-rating' })];
     expect(permissoesDe(itens)).toEqual({ nota: true, popularidade: true });
+  });
+});
+
+describe('encontrar', () => {
+  // Catalogo precisa do conjunto buscado-e-filtrado duas vezes: para ordenar e
+  // para decidir as permissoes. Um nome so para esse meio do caminho evita que
+  // a pagina e aplicar() mantenham a mesma expressao em duplicata.
+  it('busca e filtra numa passada, sem ordenar', () => {
+    const itens = [
+      item({ id: 'z', titulo: 'Docker zeta', tipo: 'modulo' }),
+      item({ id: 'a', titulo: 'Docker alfa', tipo: 'modulo' }),
+      item({ id: 'x', titulo: 'Outro assunto', tipo: 'trilha' }),
+    ];
+    const r = encontrar(itens, { ...VAZIO, texto: 'docker', tipos: ['modulo'] });
+    // A ordem de entrada e preservada: quem ordena e ordenar(), nao encontrar().
+    expect(r.map((i) => i.id)).toEqual(['z', 'a']);
+  });
+});
+
+describe('ordemEfetiva', () => {
+  const ms = item({ id: 'a', nota: 4.8, escalaNota: 'ms-rating' });
+  const alura = item({ id: 'b', plataforma: 'alura', nota: 9.4, escalaNota: 'alura-nps' });
+
+  it('mantem a ordem pedida quando ela e permitida', () => {
+    expect(ordemEfetiva([ms], 'nota')).toBe('nota');
+    expect(ordemEfetiva([ms, alura], 'duracao')).toBe('duracao');
+  });
+
+  it('cai para titulo quando a ordem pedida mistura escalas', () => {
+    expect(ordemEfetiva([ms, alura], 'nota')).toBe('titulo');
   });
 });

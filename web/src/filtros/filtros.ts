@@ -146,8 +146,25 @@ export function ordenar(itens: ItemCatalogo[], ordem: Ordem): ItemCatalogo[] {
   return [...itens].sort(comparadorDe(ordem));
 }
 
+/**
+ * Busca e filtra, sem ordenar. E o conjunto do qual tudo o mais depende: a
+ * ordenacao, e tambem as permissoes, que olham as escalas presentes no
+ * resultado e nao no catalogo inteiro. Existe para ter um nome so para esse
+ * meio do caminho: antes a pagina repetia a expressao que vive dentro de
+ * aplicar, e as duas precisavam mudar juntas se a definicao de "encontrado"
+ * mudasse. O ganho e de acoplamento, nao de tempo — medido, o passe repetido
+ * custava de 1 a 3 ms sobre os 4667 itens.
+ */
+export function encontrar(itens: ItemCatalogo[], criterios: Criterios): ItemCatalogo[] {
+  return filtrar(buscar(itens, criterios.texto), criterios);
+}
+
+/** A ordem que de fato vale: a pedida, ou titulo quando ela e proibida. */
+export function ordemEfetiva(encontrados: ItemCatalogo[], ordem: Ordem): Ordem {
+  return ordenacaoPermitida(encontrados, ordem) ? ordem : 'titulo';
+}
+
 export function aplicar(itens: ItemCatalogo[], criterios: Criterios): ItemCatalogo[] {
-  const encontrados = filtrar(buscar(itens, criterios.texto), criterios);
-  const ordem = ordenacaoPermitida(encontrados, criterios.ordem) ? criterios.ordem : 'titulo';
-  return ordenar(encontrados, ordem);
+  const encontrados = encontrar(itens, criterios);
+  return ordenar(encontrados, ordemEfetiva(encontrados, criterios.ordem));
 }
