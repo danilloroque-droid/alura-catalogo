@@ -1,0 +1,5 @@
+# core.autocrlf converteria os arquivos para CRLF no checkout, deixando o disco
+# diferente do blob. dados/index.json e os snapshots sao gerados byte a byte
+# pelo coletor e comparados entre coletas, entao o final de linha precisa ser o
+# mesmo nos dois lados. Fixar LF para tudo mantem a regra unica.
+* text=auto eol=lf
