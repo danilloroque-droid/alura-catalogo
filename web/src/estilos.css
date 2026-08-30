@@ -1,0 +1,4 @@
+:root { color-scheme: light dark; --borda: color-mix(in srgb, currentColor 15%, transparent); }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+main { padding: 1.5rem; }
