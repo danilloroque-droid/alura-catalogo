@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { coletar } from '../src/main.js';
@@ -18,18 +18,25 @@ const CATALOGO: CatalogoBruto = {
 };
 
 let dir: string;
+let snapshots: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'catalogo-'));
-  return () => rmSync(dir, { recursive: true, force: true });
+  snapshots = mkdtempSync(join(tmpdir(), 'catalogo-snapshots-'));
+  return () => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(snapshots, { recursive: true, force: true });
+  };
+});
+
+const opcoes = () => ({
+  diretorio: dir,
+  diretorioSnapshots: snapshots,
+  agora: new Date('2026-08-29T12:00:00Z'),
 });
 
 describe('coletar', () => {
   it('grava indice, snapshot e relatorio', async () => {
-    await coletar({
-      diretorio: dir,
-      agora: new Date('2026-08-29T12:00:00Z'),
-      buscar: async () => CATALOGO,
-    });
+    await coletar({ ...opcoes(), buscar: async () => CATALOGO });
 
     const indice = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8'));
     expect(indice.itens).toHaveLength(1);
@@ -37,7 +44,7 @@ describe('coletar', () => {
     expect(indice.fontes[0].total).toBe(1);
 
     const snapshot = JSON.parse(
-      readFileSync(join(dir, 'snapshots', '2026-08-29.json'), 'utf8'),
+      readFileSync(join(snapshots, '2026-08-29.json'), 'utf8'),
     );
     expect(snapshot.itens).toHaveLength(1);
 
@@ -46,11 +53,20 @@ describe('coletar', () => {
     expect(relatorio.fontes[0].total).toBe(1);
   });
 
+  // O publicDir do Vite copia dados/ inteiro para o dist. Um snapshot ali
+  // dentro dobra o tamanho do deploy com um arquivo que o site nunca le, e
+  // cresce a cada coleta.
+  it('mantem o snapshot fora do diretorio que o site publica', async () => {
+    await coletar({ ...opcoes(), buscar: async () => CATALOGO });
+
+    expect(existsSync(join(dir, 'snapshots'))).toBe(false);
+    expect(existsSync(join(snapshots, '2026-08-29.json'))).toBe(true);
+  });
+
   it('propaga a falha da fonte sem gravar indice pela metade', async () => {
     await expect(
       coletar({
-        diretorio: dir,
-        agora: new Date('2026-08-29T12:00:00Z'),
+        ...opcoes(),
         buscar: async () => { throw new Error('Microsoft Learn respondeu 503'); },
       }),
     ).rejects.toThrow('503');
@@ -60,8 +76,7 @@ describe('coletar', () => {
 
   it('registra rotulos nao mapeados no relatorio', async () => {
     await coletar({
-      diretorio: dir,
-      agora: new Date('2026-08-29T12:00:00Z'),
+      ...opcoes(),
       buscar: async () => ({
         modules: [{ ...CATALOGO.modules![0]!, uid: 'm2', subjects: ['assunto-novo'] }],
       }),
