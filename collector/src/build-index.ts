@@ -60,7 +60,22 @@ export function construirIndice(fontes: ResultadoFonte[], geradoEm: string): Ind
     itens,
   };
 }
-
+/**
+ * JSON valido, mas com um item por linha. O conteudo e identico ao de
+ * JSON.stringify — o site segue fazendo JSON.parse sem saber da diferenca —,
+ * e o que muda e o diff no git: num arquivo de uma linha so, trocar o titulo
+ * de um curso reescreve a linha inteira de 4 MB e o diff fica ilegivel. Com
+ * uma linha por item, o diff mostra exatamente os cursos que mudaram, que e o
+ * proposito declarado da ordem fixa de chaves em CHAVES.
+ */
 export function serializar(indice: Indice): string {
-  return JSON.stringify(indice);
+  const { geradoEm, fontes, temas, itens } = indice;
+  const cabecalho = [
+    `"geradoEm":${JSON.stringify(geradoEm)}`,
+    `"fontes":${JSON.stringify(fontes)}`,
+    `"temas":${JSON.stringify(temas)}`,
+  ].join(',\n');
+  const linhas = itens.map((i) => JSON.stringify(i)).join(',\n');
+
+  return `{\n${cabecalho},\n"itens":[\n${linhas}\n]\n}\n`;
 }

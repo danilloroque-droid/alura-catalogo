@@ -90,3 +90,35 @@ describe('invariante valor/escala', () => {
     ])], QUANDO)).not.toThrow();
   });
 });
+
+describe('serializar', () => {
+  const QUANDO = '2026-08-29T00:00:00Z';
+  const tres = () => construirIndice([fonte([item('a'), item('b'), item('c')])], QUANDO);
+
+  it('continua sendo JSON valido, com o mesmo conteudo', () => {
+    const indice = tres();
+    expect(JSON.parse(serializar(indice))).toEqual(indice);
+  });
+
+  it('escreve um item por linha', () => {
+    const linhas = serializar(tres()).split('\n');
+    expect(linhas.filter((l) => l.startsWith('{"id":'))).toHaveLength(3);
+  });
+
+  // A razao de existir do formato: num arquivo de uma linha so, mudar um curso
+  // reescreve a linha inteira e o diff no git fica ilegivel. Uma linha por item
+  // faz o diff mostrar exatamente o curso que mudou.
+  it('isola a mudanca de um item numa linha que nao carrega os outros', () => {
+    const antes = serializar(tres()).split('\n');
+    const depois = serializar(
+      construirIndice([fonte([item('a'), item('b', { titulo: 'outro' }), item('c')])], QUANDO),
+    ).split('\n');
+
+    expect(depois).toHaveLength(antes.length);
+    const diferentes = antes.filter((linha, i) => linha !== depois[i]);
+    expect(diferentes).toHaveLength(1);
+    expect(diferentes[0]).toContain('"id":"b"');
+    expect(diferentes[0]).not.toContain('"id":"a"');
+    expect(diferentes[0]).not.toContain('"id":"c"');
+  });
+});
