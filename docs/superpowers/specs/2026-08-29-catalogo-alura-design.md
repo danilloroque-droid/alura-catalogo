@@ -47,11 +47,29 @@ Quatro APIs foram sondadas diretamente em 2026-08-29. A comparação abaixo é c
 | `certifications` | 151 |
 | **Total catalogável** | **4.667** |
 
-Campos por item: `uid`, `title`, `summary` (214 caracteres em média), `url`, `duration_in_minutes`, `levels`, `roles`, `products`, `subjects`, `popularity`, `rating` (só em `learningPaths`), `last_modified`, `icon_url`.
-
-Taxonomia entregue pronta e traduzida: 6 `subjects` com subníveis, 60 `products`, 35 `roles`, 3 `levels`. Locales confirmados: `pt-br`, `en-us`, `es-es`.
+Taxonomia entregue pronta e traduzida: 6 `subjects` com subníveis (76 distintos em uso), 60 `products`, 35 `roles`, 3 `levels`. Locales confirmados: `pt-br`, `en-us`, `es-es`.
 
 As 28.466 `units` (conteúdo interno de cada módulo) são **descartadas** — irrelevantes para um catálogo e responsáveis por metade do payload.
+
+**Os quatro tipos não compartilham o mesmo formato.** Esta tabela é o contrato real, verificado campo a campo, e é o que o normalizador precisa tratar:
+
+| | `modules` | `learningPaths` | `courses` | `certifications` |
+|---|---|---|---|---|
+| Texto descritivo | `summary`, texto puro | `summary`, texto puro | `summary`, **contém HTML** | `subtitle`, **contém HTML** |
+| Duração | `duration_in_minutes` | `duration_in_minutes` | **`duration_in_hours`** | ausente |
+| `subjects` | 2.796 de 3.524 | 718 de 849 | **nenhum** | **nenhum** |
+| `roles` | 3.524 (100%) | 849 (100%) | 143 (100%) | 151 (100%) |
+| `products` | 3.524 | 849 | 143 | **ausente** |
+| `popularity` | 3.424 de 3.524 | presente | ausente | ausente |
+| `rating` | ausente | `{count, average}` | ausente | ausente |
+
+Consequências diretas para o normalizador:
+
+- **A taxonomia não pode se apoiar em `subjects`:** cursos e certificações não têm nenhum. A precedência é `subjects` → `roles` → `products`, e só `roles` tem cobertura de 100% em todos os tipos.
+- **Descrições precisam de remoção de HTML** em cursos e certificações.
+- **`duration_in_hours` × 60** nos cursos, para unificar em minutos.
+- **`last_modified` é ISO completo com fuso** (`2026-08-27T22:13:00+00:00`), truncado para `AAAA-MM-DD`.
+- **`rating` é praticamente inexistente:** apenas **1 das 849 trilhas** tem `count > 0`. Na prática, itens do Microsoft Learn não têm nota, e ordenar por nota é um recurso quase exclusivo da Alura. Isso reforça, e não enfraquece, a decisão da seção 5.1.
 
 ### 3.2 Alura
 
@@ -132,6 +150,7 @@ export interface ItemCatalogo {
   plataforma: Plataforma;
   tipo: TipoItem;
   titulo: string;
+  resumo: string | null;         // texto puro, sem HTML
   url: string;                   // link para a plataforma de origem
   duracaoMinutos: number | null;
   nivel: Nivel | null;
@@ -212,8 +231,9 @@ Um mapa escrito à mão converte ambos para este conjunto de temas unificados:
 
 Doze temas é deliberado: poucos o bastante para caber num painel de filtros sem rolagem, específicos o bastante para separar o que de fato se procura. O mapa é a única peça do sistema que precisa de julgamento humano — todo o resto é derivado dos dados.
 
-Duas regras o mantêm confiável:
+Três regras o mantêm confiável:
 
+- **Precedência explícita de rótulos:** `subjects` → `roles` → `products`. Cursos e certificações do Microsoft Learn não têm `subjects` nenhum, e `roles` é o único rótulo com cobertura de 100% em todos os tipos — apoiar a taxonomia só em `subjects` deixaria 294 itens sem tema.
 - **Nada se perde:** cada item também guarda `temasOriginais` com os rótulos crus, permitindo filtrar do jeito nativo de cada plataforma
 - **Nada é descartado em silêncio:** rótulo sem mapeamento cai no tema `outros` **e** entra em `relatorio.json`, para revisão manual e ampliação consciente do mapa
 
@@ -268,17 +288,16 @@ O Radar só produz resultado a partir da **segunda** coleta; a primeira estabele
 
 ## 8. Índice e carregamento
 
-Volume medido, com Alura e Microsoft Learn somados (6.976 itens):
+`resumo` vive no `index.json`, não num arquivo separado: itens do Microsoft Learn não têm arquivo de detalhe, então o resumo é dado de exibição obrigatório. Isso tem uma consequência boa — **a busca por título e resumo funciona assim que o índice chega**, sem esperar mais nada.
 
-| Arquivo | Tamanho |
-|---|---|
-| `index.json` — exibição e filtros | **2,64 MB** |
-| `busca.json` — texto de títulos, resumos e ementas | ~1,95 MB |
-| Total | 4,59 MB (~1,1 MB comprimido) |
+| Arquivo | Conteúdo | Tamanho |
+|---|---|---|
+| `index.json` | exibição, filtros, título e resumo | 3,01 MB só com Microsoft Learn; ~3,9 MB com a Alura |
+| `busca.json` | **apenas o texto extra**: capítulos e seções da ementa da Alura | ~1,0 MB, e **inexistente enquanto a Alura não entrar** |
 
-**Carregamento em duas etapas.** `index.json` chega primeiro e o catálogo já funciona: navegar, filtrar por plataforma, tema, nível, duração e ordenar. `busca.json` carrega em segundo plano; enquanto isso o campo de busca fica visível mas desabilitado, exibindo "carregando busca…" em vez de fingir que não encontrou nada.
+**Carregamento em duas etapas.** `index.json` chega e o catálogo funciona por completo, incluindo busca textual em títulos e resumos. `busca.json` carrega em segundo plano e **aprofunda** a busca, passando a alcançar o conteúdo das aulas da Alura. Enquanto não chegou, a busca funciona — apenas mais rasa —, e a interface indica discretamente que a busca em ementas ainda está carregando.
 
-A alternativa — arquivo único — custaria cerca de 2 s de tela vazia no celular. A divisão custa poucas linhas e elimina essa espera.
+Essa divisão é melhor que a alternativa óbvia (jogar todo o texto de busca no segundo arquivo): ali a busca ficaria *desabilitada* até o segundo download. Aqui ela nunca fica indisponível, só fica mais rica com o tempo.
 
 ## 9. App web
 
@@ -328,7 +347,7 @@ Página de detalhe: itens do Microsoft Learn mostram resumo, taxonomia e link, j
 | Tema sem mapeamento | Cai em `outros` **e** entra no relatório; nunca some em silêncio |
 | Item descartado na normalização | Registrado no relatório com o motivo |
 | `index.json` não carrega | Tela de erro com botão "tentar de novo" |
-| `busca.json` não carrega | Catálogo funciona; busca textual permanece desabilitada com aviso |
+| `busca.json` não carrega | Busca segue funcionando em títulos e resumos; apenas não alcança ementas, com aviso discreto |
 | Detalhe da Alura dá 404 | "Este curso pode ter saído do catálogo" + link para a plataforma |
 | localStorage bloqueado (aba anônima) | App funciona; Minha Lista desativada com aviso visível |
 | URL do vídeo expirada | Player ocultado; link permanece |
