@@ -1,285 +1,383 @@
-# Catálogo de Treinamentos Alura — Design
+# Catálogo de Treinamentos Multi-Fonte — Design
 
 **Data:** 2026-08-29
 **Status:** aprovado, pronto para virar plano de implementação
+**Fontes na v1:** Microsoft Learn e Alura
 
 ## 1. Objetivo
 
-Um site pessoal que mostra **todos os cursos disponíveis agora na plataforma Alura**, com busca e filtros ricos, para decidir o que estudar em seguida. Uso individual, acessível do PC e do celular.
+Um site pessoal que reúne, num catálogo único e pesquisável, **os treinamentos disponíveis agora** em mais de uma plataforma, para decidir o que estudar em seguida. Uso individual, acessível do PC e do celular.
 
 Não é um produto público, não tem usuários além do autor, não precisa de SEO, autenticação ou escala.
 
-## 2. O que a API da Alura realmente entrega
+## 2. Escolha das fontes
 
-Verificado por sondagem direta em 2026-08-29. A documentação oficial é incompleta; o que vale é o comportamento observado.
+Quatro APIs foram sondadas diretamente em 2026-08-29. A comparação abaixo é comportamento medido, não documentação.
+
+| | **Microsoft Learn** | **Alura** | **Coursera** | **edX** |
+|---|---|---|---|---|
+| Autenticação | não | não | não | catálogo real exige JWT |
+| Requisições para o catálogo inteiro | **1** | **2.309** | 119 | 380 |
+| Itens catalogáveis | 4.667 | 2.309 | 23.776 | 37.905 (muito curso de teste) |
+| Taxonomia pronta na API | ✅ completa e traduzida | ❌ só dentro do detalhe | parcial (`domainTypes`) | ❌ |
+| Português | ✅ nativo | ✅ 100% | ~0% na amostra | ❌ |
+| CORS liberado | ✅ `*` | ✅ `*` | ❌ | ❌ |
+| Documentação confiável | ✅ oficial e estável | ❌ descreve filtros inexistentes | beta, "muda sem aviso" | oficial |
+| Licença para republicar | Microsoft APIs Terms of Use | não declarada | ❌ proibido republicar descrições | — |
+
+**Escolhidas: Microsoft Learn e Alura.**
+
+**Coursera foi descartada** apesar do volume: a própria documentação declara que a API é beta e pode mudar de forma incompatível sem aviso, e que os direitos das descrições pertencem às universidades parceiras, sem licença para republicação. Num site publicado, isso é um risco jurídico real por um catálogo majoritariamente em inglês e sem nenhuma métrica de qualidade.
+
+**edX foi descartada** porque o endpoint público é o da LMS, não o de catálogo: devolve 37.905 objetos incluindo cursos de teste e turmas privadas, sem assunto, sem nota e sem idioma utilizável. O catálogo curado exige autenticação JWT.
+
+## 3. O que cada API entrega
+
+### 3.1 Microsoft Learn
+
+`GET https://learn.microsoft.com/api/catalog/?locale=pt-br&type=modules,learningPaths,courses,certifications,levels,products,roles,subjects`
+
+**Uma única requisição devolve o catálogo inteiro:** 7,55 MB, `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=86399`.
+
+| Coleção | Quantidade |
+|---|---|
+| `modules` | 3.524 |
+| `learningPaths` | 849 |
+| `courses` | 143 |
+| `certifications` | 151 |
+| **Total catalogável** | **4.667** |
+
+Campos por item: `uid`, `title`, `summary` (214 caracteres em média), `url`, `duration_in_minutes`, `levels`, `roles`, `products`, `subjects`, `popularity`, `rating` (só em `learningPaths`), `last_modified`, `icon_url`.
+
+Taxonomia entregue pronta e traduzida: 6 `subjects` com subníveis, 60 `products`, 35 `roles`, 3 `levels`. Locales confirmados: `pt-br`, `en-us`, `es-es`.
+
+As 28.466 `units` (conteúdo interno de cada módulo) são **descartadas** — irrelevantes para um catálogo e responsáveis por metade do payload.
+
+### 3.2 Alura
 
 | Endpoint | Comportamento real |
 |---|---|
-| `GET /api/cursos` | 2.309 cursos. **Apenas 3 campos:** `slug`, `nome`, `tempo_estimado`. 312 KB, `Cache-Control: public, max-age=7200` |
-| `GET /api/curso-<slug>` | ~23 KB por curso: `categoria`, `subcategoria`, `nota`, `quantidade_alunos`, `carga_horaria`, `quantidade_aulas`, `minutos_video`, `ementa`, `instrutores`, `publico_alvo`, `requerimentos`, `data_criacao`, `data_atualizacao`, `video_1a_aula`, `showable`, `curso_substituto` |
+| `GET /api/cursos` | 2.309 cursos, **apenas** `slug`, `nome`, `tempo_estimado`. 312 KB, `Cache-Control: max-age=7200` |
+| `GET /api/curso-<slug>` | ~23 KB: `categoria`, `subcategoria`, `nota`, `quantidade_alunos`, `carga_horaria`, `quantidade_aulas`, `minutos_video`, `ementa`, `instrutores`, `publico_alvo`, `requerimentos`, `data_criacao`, `data_atualizacao`, `video_1a_aula`, `showable`, `curso_substituto` |
 
-**Achados que moldam o design:**
+Achados que moldam o coletor:
 
-- **Os filtros documentados não funcionam.** `?categoria=` e `?subcategoria=` são ignorados — a resposta volta idêntica (mesmos 2.309 itens, mesmo tamanho). A taxonomia só existe dentro do detalhe de cada curso.
-- **Não existem endpoints de listagem auxiliares.** `/api/categorias`, `/api/formacoes` e `/api/cursos/<categoria>` retornam 404. `/api/formacao-data-science`, citado na documentação, também retorna 404.
-- **Sem autenticação e sem token.** `access-control-allow-origin: *` — chamável direto do navegador, sem proxy.
-- **`video_1a_aula` é uma URL assinada com expiração de 7 dias** (`X-Amz-Expires=604800`). Não pode ser cacheada por mais tempo que isso.
-- **O `/api/cursos` já lista apenas cursos ativos.** Na amostra de 12 cursos, todos vieram com `showable: true` e `curso_substituto: null`. O coletor valida essa premissa em vez de assumi-la.
+- **Os filtros documentados não funcionam.** `?categoria=` e `?subcategoria=` são ignorados — resposta idêntica, mesmo tamanho.
+- **Não há endpoints auxiliares.** `/api/categorias`, `/api/formacoes` e `/api/cursos/<categoria>` retornam 404. `/api/formacao-data-science`, citado na documentação oficial, também retorna 404.
+- **A taxonomia só existe dentro do detalhe de cada curso** — daí as 2.309 requisições.
+- **`video_1a_aula` é URL assinada com expiração de 7 dias** (`X-Amz-Expires=604800`).
+- **`/api/cursos` já lista apenas cursos ativos.** Em amostra de 12, todos com `showable: true` e `curso_substituto: null`. O coletor valida em vez de assumir.
+- Detalhes brutos completos somam 50,9 MB.
 
-**Volume de dados medido** (amostra de 12 cursos, extrapolada para 2.309):
-
-| Conjunto | Tamanho |
-|---|---|
-| Detalhes brutos completos | 50,9 MB |
-| Índice enxuto (sem ementa) | 0,6 MB |
-| Índice + texto da ementa para busca | **1,6 MB** (~400 KB com gzip) |
-
-Consequência direta: **um índice único de 1,6 MB carrega de uma vez e permite busca, filtro e ordenação inteiramente em memória**, sem paginação e sem backend. Os detalhes ficam em arquivos separados, buscados sob demanda.
-
-## 3. Arquitetura
+## 4. Arquitetura
 
 ```
-API Alura ──▶ coletor (Node+TS) ──▶ dados/ versionados no git ──▶ site React ──▶ GitHub Pages
-             (1x/semana via CI)      (índice, detalhes, snapshots)  (100% no navegador)
+Microsoft Learn ─┐
+                 ├─▶ coletor (Node+TS) ──▶ dados/ no git ──▶ site React ──▶ GitHub Pages
+Alura ───────────┘    (1x/semana via CI)   (índice, busca,    (100% no navegador)
+                                            detalhes, snapshots)
 ```
 
-**Princípio central:** só o coletor conhece o JSON cru da Alura. Ele normaliza para os tipos de `shared/types.ts`, e o site enxerga exclusivamente esses tipos. Uma mudança na API se conserta em um arquivo de normalização, sem tocar no site.
+**Princípio central:** cada fonte tem seu próprio normalizador, e só ele conhece o formato cru daquela plataforma. Tudo converge para os tipos de `shared/types.ts`, e o site enxerga exclusivamente esses tipos. Somar ou trocar uma plataforma é escrever um normalizador — o site fica intocado.
 
 ```
-alura-catalogo/
-├─ shared/types.ts          # contrato entre as duas metades
+catalogo-treinamentos/
+├─ shared/
+│  ├─ types.ts             # contrato único entre coletor e site
+│  └─ temas.ts             # mapa de taxonomia por plataforma
 ├─ collector/
 │  ├─ src/
-│  │  ├─ alura-client.ts    # HTTP puro: listar(), detalhe(slug), retry, throttle
-│  │  ├─ normalize.ts       # JSON cru ──▶ tipos do domínio
-│  │  ├─ build-index.ts     # monta index.json determinístico
-│  │  ├─ diff-snapshots.ts  # compara snapshots ──▶ novidades.json
-│  │  └─ main.ts            # orquestra
-│  ├─ fixtures/             # respostas reais gravadas, usadas nos testes
+│  │  ├─ fontes/
+│  │  │  ├─ ms-learn/      # client.ts, normalize.ts
+│  │  │  └─ alura/         # client.ts, normalize.ts
+│  │  ├─ build-index.ts    # índice determinístico + arquivo de busca
+│  │  ├─ diff-snapshots.ts # novidades.json
+│  │  └─ main.ts           # orquestra as fontes, tolera falha isolada
+│  ├─ fixtures/            # respostas reais gravadas, usadas nos testes
 │  └─ tests/
-├─ web/                     # React + Vite + TypeScript
+├─ web/                    # React + Vite + TypeScript
 │  ├─ src/
-│  │  ├─ dados/             # carrega índice e detalhes
-│  │  ├─ filtros/           # lógica pura de busca/filtro/ordenação
-│  │  ├─ minha-lista/       # localStorage + exportar/importar
-│  │  ├─ paginas/           # Catalogo, Curso, Radar, MinhaLista
+│  │  ├─ dados/            # carrega índice, busca e detalhes
+│  │  ├─ filtros/          # lógica pura de busca/filtro/ordenação
+│  │  ├─ minha-lista/      # localStorage + exportar/importar
+│  │  ├─ paginas/          # Catalogo, Item, Radar, MinhaLista
 │  │  └─ componentes/
 │  └─ tests/
-└─ dados/                   # SAÍDA, versionada no git
-   ├─ index.json
-   ├─ cursos/<slug>.json
+└─ dados/                  # SAÍDA, versionada no git
+   ├─ index.json           # 2,6 MB — exibição e filtros
+   ├─ busca.json           # texto de busca, carregado em segundo plano
+   ├─ detalhes/alura/<slug>.json
    ├─ snapshots/AAAA-MM-DD.json
-   └─ novidades.json
+   ├─ novidades.json
+   └─ relatorio.json       # o que foi coletado, descartado e por quê
 ```
 
-**Por que os dados ficam no git.** Um catálogo pessoal não justifica banco de dados. Commitar dá histórico, diff e rollback de graça, e o Radar de novidades vira uma comparação entre dois arquivos em vez de uma feature de infraestrutura.
+**Por que os dados ficam no git.** Um catálogo pessoal não justifica banco de dados. Commitar dá histórico, diff e rollback de graça, e o Radar de novidades vira a comparação de dois arquivos em vez de uma feature de infraestrutura.
 
-**Por que índice único, não paginado.** 1,6 MB baixa uma vez e todo filtro subsequente é instantâneo, sem rede. Paginar adicionaria complexidade e pioraria a experiência.
+**Por que só a Alura tem arquivos de detalhe.** O catálogo do Microsoft Learn já vem completo na resposta única — não existe endpoint de detalhe nem necessidade dele. A Alura, ao contrário, guarda ementa, instrutores e requisitos apenas no detalhe de cada curso.
 
-**Por que os detalhes ficam separados.** Juntar tudo significaria 51 MB no carregamento inicial para dados que só são vistos ao abrir um curso específico.
-
-## 4. Contrato de tipos (`shared/types.ts`)
+## 5. Contrato de tipos (`shared/types.ts`)
 
 ```ts
-export interface CursoIndice {
-  slug: string;
-  nome: string;
-  categoria: string | null;          // slug, ex.: "back-end"
-  categoriaNome: string | null;      // ex.: "Back-end"
-  subcategoria: string | null;       // ex.: "csharp-dotnet"
-  subcategoriaNome: string | null;   // ex.: "C# e .NET"
-  cargaHoraria: number;              // horas
-  quantidadeAulas: number;
-  minutosVideo: number;
-  nota: number | null;               // null quando nota_disponivel = false
-  quantidadeAvaliacoes: number;
-  quantidadeAlunos: number;
-  dataCriacao: string;               // AAAA-MM-DD
-  dataAtualizacao: string;           // AAAA-MM-DD
-  instrutores: string[];             // nomes achatados
-  ementaTexto: string;               // capítulos + seções, só para busca
-  ehCheckpoint: boolean;
+export type Plataforma = 'ms-learn' | 'alura';
+export type TipoItem = 'curso' | 'modulo' | 'trilha' | 'certificacao';
+export type Nivel = 'iniciante' | 'intermediario' | 'avancado';
+
+// A escala acompanha o valor: notas de plataformas diferentes NÃO são comparáveis.
+export type EscalaNota = 'alura-nps' | 'ms-rating';
+export type EscalaPopularidade = 'alura-alunos' | 'ms-popularity';
+
+export interface ItemCatalogo {
+  id: string;                    // `${plataforma}:${slug|uid}`
+  plataforma: Plataforma;
+  tipo: TipoItem;
+  titulo: string;
+  url: string;                   // link para a plataforma de origem
+  duracaoMinutos: number | null;
+  nivel: Nivel | null;
+  temas: string[];               // taxonomia unificada
+  temasOriginais: string[];      // rótulos crus da plataforma, preservados
+  instrutores: string[];         // sempre vazio no Microsoft Learn
+  idioma: string;                // 'pt-BR'
+  criadoEm: string | null;       // AAAA-MM-DD
+  atualizadoEm: string | null;   // AAAA-MM-DD
+  nota: number | null;
+  escalaNota: EscalaNota | null;
+  popularidade: number | null;
+  escalaPopularidade: EscalaPopularidade | null;
+  ehCheckpoint: boolean;         // só Alura; sempre false no MS Learn
 }
 
-export interface Capitulo {
-  capitulo: string;
-  secoes: string[];
+export interface Indice {
+  geradoEm: string;              // ISO
+  fontes: { plataforma: Plataforma; total: number; coletadoEm: string }[];
+  temas: { id: string; nome: string }[];
+  itens: ItemCatalogo[];
 }
 
-export interface Instrutor {
-  nome: string;
-  username: string;
-  fotoUrl: string | null;
+// Arquivo separado, carregado em segundo plano.
+export interface EntradaBusca {
+  id: string;
+  texto: string;                 // título + resumo + ementa, sem acento, minúsculo
 }
 
-export interface CursoDetalhe extends CursoIndice {
+export interface Capitulo { capitulo: string; secoes: string[] }
+export interface Instrutor { nome: string; username: string; fotoUrl: string | null }
+
+// Detalhe existe apenas para a Alura; discriminado por `plataforma`.
+export interface DetalheAlura extends ItemCatalogo {
+  plataforma: 'alura';
   metaDescription: string | null;
   publicoAlvo: string[];
   requerimentos: string[];
   ementa: Capitulo[];
   instrutoresDetalhe: Instrutor[];
+  quantidadeAulas: number;
+  quantidadeAvaliacoes: number;
   videoPrimeiraAula: string | null;
-  videoColetadoEm: string;           // ISO — o site usa para saber se expirou
+  videoColetadoEm: string;       // ISO — o site usa para saber se expirou
 }
 
 export type TipoNovidade = 'novo' | 'removido' | 'atualizado';
-
 export interface Novidade {
-  slug: string;
-  nome: string;
+  id: string;
+  titulo: string;
+  plataforma: Plataforma;
   tipo: TipoNovidade;
-  detectadoEm: string;               // AAAA-MM-DD
-}
-
-export interface Taxonomia {
-  slug: string;
-  nome: string;
-  subcategorias: { slug: string; nome: string }[];
-}
-
-export interface Indice {
-  geradoEm: string;                  // ISO
-  totalCursos: number;
-  taxonomia: Taxonomia[];
-  cursos: CursoIndice[];
+  detectadoEm: string;           // AAAA-MM-DD
 }
 ```
 
-As contagens por categoria **não** são pré-calculadas: mudam conforme os filtros ativos, então o site as calcula em memória.
+### 5.1 Notas não são comparáveis entre plataformas
 
-## 5. Coletor
+Esta é a decisão de modelagem mais importante do documento.
 
-Responsabilidade única: transformar a API caótica da Alura em arquivos limpos e determinísticos.
+A Alura publica **nota NPS de 0 a 10 apoiada em milhares de avaliações** (`nota: 9.4`, `quantidade_avaliacoes: 5826`). O Microsoft Learn publica um `popularity` interno de 0 a 1, e `rating` apenas nas trilhas. São grandezas de natureza diferente, com amostras e significados diferentes.
 
-### 5.1 `alura-client.ts` — só HTTP
+Fundir as duas numa coluna "nota" produziria um ranking bonito e falso. Portanto:
 
-- Concorrência fixa de **4 requisições simultâneas**
-- Timeout de **15 s** por requisição
-- **3 tentativas** com backoff exponencial
-- `User-Agent` identificável, informando que é um catálogo pessoal
-- Varredura completa estimada em **5 a 10 minutos** — devagar de propósito, por se tratar de API gratuita de terceiros
+- O valor sempre viaja acompanhado da sua escala (`nota` + `escalaNota`)
+- A interface renderiza cada escala no seu próprio idioma visual, nunca convertida
+- **Ordenar por nota opera dentro de uma plataforma.** Com o filtro abrangendo as duas, a ordenação por nota fica desabilitada e a interface explica o motivo em uma linha
 
-**Cache em disco** (`.cache/`, fora do git): cada detalhe baixado é gravado antes de ser processado. Uma coleta interrompida no curso 1.800 reaproveita os 1.799 anteriores. Isso também permite iterar no normalizador sobre dados locais, sem tocar na rede.
+Uma fricção honesta é preferível a um número inventado.
 
-Não há coleta incremental: o `/api/cursos` não expõe `data_atualizacao`, então não há como saber o que mudou sem baixar o detalhe. Uma varredura completa semanal de 5–10 min é aceitável e mais simples.
+## 6. Taxonomia unificada (`shared/temas.ts`)
 
-### 5.2 `normalize.ts` — o único lugar que conhece o formato da Alura
+Alura organiza em `back-end`, `front-end`, `dados`, `design-ux`, `inteligencia-artificial`, `gestao-negocios`. Microsoft Learn organiza em `app-development`, `data-management`, `infrastructure`, `artificial-intelligence`, `security`, `business-applications`.
 
-Decisões explícitas e testadas:
+Um mapa escrito à mão converte ambos para este conjunto de temas unificados:
+
+`back-end`, `front-end`, `mobile`, `dados`, `inteligencia-artificial`, `infraestrutura-nuvem`, `devops`, `seguranca`, `design-ux`, `gestao-negocios`, `produtividade`, `outros`.
+
+Doze temas é deliberado: poucos o bastante para caber num painel de filtros sem rolagem, específicos o bastante para separar o que de fato se procura. O mapa é a única peça do sistema que precisa de julgamento humano — todo o resto é derivado dos dados.
+
+Duas regras o mantêm confiável:
+
+- **Nada se perde:** cada item também guarda `temasOriginais` com os rótulos crus, permitindo filtrar do jeito nativo de cada plataforma
+- **Nada é descartado em silêncio:** rótulo sem mapeamento cai no tema `outros` **e** entra em `relatorio.json`, para revisão manual e ampliação consciente do mapa
+
+## 7. Coletores
+
+### 7.1 Microsoft Learn
+
+Uma requisição, sem throttling, sem cache de rede. Descarta `units`. Normaliza `levels[0]` para `Nivel`, concatena `subjects` + `roles` + `products` em `temasOriginais`, mapeia `duration_in_minutes` direto e usa `last_modified` como `atualizadoEm`.
+
+`popularity` vira `popularidade` com escala `ms-popularity`; `rating` das trilhas vira `nota` com escala `ms-rating`. Módulos e cursos ficam com `nota: null`.
+
+### 7.2 Alura
+
+**`client.ts` — só HTTP.** Concorrência fixa de 4 requisições simultâneas, timeout de 15 s, 3 tentativas com backoff exponencial, `User-Agent` identificável. Varredura completa estimada em **5 a 10 minutos** — devagar de propósito, por se tratar de API gratuita de terceiros.
+
+**Cache em disco** (`.cache/`, fora do git): cada detalhe é gravado antes de ser processado. Coleta interrompida no curso 1.800 reaproveita os 1.799 anteriores, e o normalizador pode ser desenvolvido inteiramente sobre dados locais, sem tocar a rede.
+
+Sem coleta incremental: `/api/cursos` não expõe `data_atualizacao`, então não há como saber o que mudou sem baixar o detalhe. Varredura completa semanal é aceitável e mais simples.
+
+**`normalize.ts` — decisões explícitas e testadas:**
 
 - Descartar cursos com `showable: false` ou `curso_substituto` preenchido — não estão mais disponíveis
 - `nota` vira `null` quando `nota_disponivel` é falso, nunca zero
-- `instrutores` achatado para nomes no índice; objeto completo apenas no detalhe
-- `categoria: null` tratado sem quebrar; o curso aparece como "sem categoria"
-- Cursos do tipo *checkpoint* (avaliações, não aulas) marcados com `ehCheckpoint: true` para poderem ser escondidos. **Regra de detecção:** `slug` começando com `checkpoint-` (ex.: `checkpoint-back-end-php-nivel-1`). A regra é validada por fixture; se a coleta encontrar cursos com "checkpoint" no nome mas fora desse padrão, eles entram no relatório para revisão manual — a regra nunca é ampliada em silêncio
-- `ementaTexto` = capítulos e seções concatenados, apenas para alimentar a busca
+- `quantidade_alunos` vira `popularidade` com escala `alura-alunos`
+- `carga_horaria` (horas) convertida para `duracaoMinutos`
+- `categoria: null` não quebra; o item recebe o tema `outros`
+- Checkpoints marcados com `ehCheckpoint: true`. **Regra de detecção:** `slug` começando com `checkpoint-` (ex.: `checkpoint-back-end-php-nivel-1`), validada por fixture. Cursos com "checkpoint" no nome fora desse padrão entram no relatório — a regra nunca é ampliada em silêncio
+- A Alura não expõe nível de dificuldade: `nivel` fica `null`
 
-### 5.3 `build-index.ts` — serialização determinística
+### 7.3 Orquestração e isolamento de falhas
 
-Chaves em ordem fixa e arrays ordenados por slug. Sem isso, cada coleta produziria um diff enorme e inútil no git e a comparação de snapshots viraria ruído.
+`main.ts` roda as fontes de forma independente. **A regra de segurança vale por fonte:**
 
-### 5.4 `diff-snapshots.ts`
+- Microsoft Learn: se a requisição única falhar após as tentativas, a fonte é considerada falha
+- Alura: se mais de 5% dos detalhes falharem, a fonte é considerada falha
 
-Compara o snapshot novo com o anterior e classifica cada mudança:
+**Uma fonte falha preserva os dados da coleta anterior; as demais atualizam normalmente.** O índice é reconstruído combinando dados novos e preservados, e `relatorio.json` registra qual fonte está desatualizada e desde quando. Uma API quebrada nunca derruba o catálogo inteiro nem publica um catálogo pela metade.
 
-- **novo** — slug ausente no snapshot anterior
-- **removido** — slug ausente no snapshot novo
-- **atualizado** — `dataAtualizacao` mudou
+### 7.4 Determinismo
 
-O Radar de novidades só produz resultado a partir da **segunda** coleta; a primeira estabelece a linha de base.
+Chaves em ordem fixa e itens ordenados por `id`. Sem isso, cada coleta produziria um diff enorme e inútil no git e a comparação de snapshots viraria ruído.
 
-### 5.5 Regra de segurança
+### 7.5 Novidades
 
-**Se mais de 5% dos detalhes falharem, o coletor aborta sem escrever em `dados/`.** Um catálogo de uma semana atrás é melhor que um catálogo pela metade publicado por cima do bom.
+`diff-snapshots.ts` compara o snapshot novo com o anterior por `id`:
 
-Ao final, o coletor imprime um relatório: total coletado, descartados (com motivo), falhas e tempo.
+- **novo** — ausente no snapshot anterior
+- **removido** — ausente no snapshot novo
+- **atualizado** — `atualizadoEm` mudou
 
-## 6. App web
+O Radar só produz resultado a partir da **segunda** coleta; a primeira estabelece a linha de base.
 
-### 6.1 Rotas
+## 8. Índice e carregamento
 
-Roteamento **por hash** (`/#/curso/<slug>`), porque o GitHub Pages devolve 404 em rotas de SPA e o contorno com `404.html` não se justifica aqui.
+Volume medido, com Alura e Microsoft Learn somados (6.976 itens):
+
+| Arquivo | Tamanho |
+|---|---|
+| `index.json` — exibição e filtros | **2,64 MB** |
+| `busca.json` — texto de títulos, resumos e ementas | ~1,95 MB |
+| Total | 4,59 MB (~1,1 MB comprimido) |
+
+**Carregamento em duas etapas.** `index.json` chega primeiro e o catálogo já funciona: navegar, filtrar por plataforma, tema, nível, duração e ordenar. `busca.json` carrega em segundo plano; enquanto isso o campo de busca fica visível mas desabilitado, exibindo "carregando busca…" em vez de fingir que não encontrou nada.
+
+A alternativa — arquivo único — custaria cerca de 2 s de tela vazia no celular. A divisão custa poucas linhas e elimina essa espera.
+
+## 9. App web
+
+### 9.1 Rotas
+
+Roteamento **por hash** (`/#/item/<id>`), porque o GitHub Pages devolve 404 em rotas de SPA e o contorno com `404.html` não se justifica aqui.
 
 - `#/` — Catálogo
-- `#/curso/:slug` — Detalhe
+- `#/item/:id` — Detalhe
 - `#/novidades` — Radar
 - `#/lista` — Minha Lista
 
-### 6.2 Camadas
+### 9.2 Camadas
 
-**`filtros/`** — o coração, sem nenhuma dependência de React. Funções puras: `buscar(cursos, texto)`, `filtrar(cursos, criterios)`, `ordenar(cursos, campo)`. Com 2.309 itens em memória, o filtro linear roda em ~1 ms; não há necessidade de Fuse.js nem de índice invertido. A busca normaliza acentos e caixa, e varre `nome` + `ementaTexto`.
+**`filtros/`** — o coração, sem nenhuma dependência de React. Funções puras: `buscar(itens, indiceBusca, texto)`, `filtrar(itens, criterios)`, `ordenar(itens, campo)`. Com ~7.000 itens em memória, o filtro linear roda em poucos milissegundos; não há necessidade de Fuse.js nem de índice invertido. A busca normaliza acentos e caixa.
 
-**`dados/`** — carrega `index.json` uma vez e mantém em memória; detalhes buscados sob demanda.
+**`dados/`** — carrega `index.json`, depois `busca.json` em segundo plano, e detalhes da Alura sob demanda.
 
-**`minha-lista/`** — localStorage guardando **apenas slug + estado + data**, nunca os dados do curso, para que a lista continue válida após atualizações do catálogo. Exportar/importar JSON resolve a transferência entre PC e celular.
+**`minha-lista/`** — localStorage guardando **apenas id + estado + data**, nunca os dados do item, para que a lista continue válida após atualizações do catálogo. Exportar/importar JSON resolve a transferência entre PC e celular.
 
-### 6.3 Estado dos filtros na URL
+### 9.3 Estado dos filtros na URL
 
-`#/?q=docker&cat=back-end&nota=9&ordem=alunos`
+`#/?q=docker&plat=ms-learn&tema=infraestrutura&nivel=iniciante&ordem=duracao`
 
 O botão voltar funciona, buscas úteis podem ser favoritadas e recarregar a página não perde nada.
 
-### 6.4 Filtros disponíveis
+### 9.4 Filtros
 
-Texto livre; categoria; subcategoria; nota mínima; faixa de carga horária; instrutor; esconder checkpoints. Ordenação por nota, número de alunos, carga horária ou data de atualização.
+Texto livre; **plataforma**; **tipo** (curso, módulo, trilha, certificação); tema; nível; faixa de duração; instrutor (só Alura); esconder checkpoints.
 
-### 6.5 Layout
+Ordenação por duração, data de atualização, popularidade ou nota — as duas últimas **restritas a uma única plataforma**, conforme a seção 5.1.
 
-Painel de filtros fixo à esquerda, virando gaveta no celular; grade de cards à direita com contador de resultados sempre visível. **60 cards renderizados por vez, com "mostrar mais"** — 2.309 nós no DOM travam o navegador, e esta solução é mais simples que virtualização.
+### 9.5 Layout
 
-Cada card: nome, categoria, carga horária, nota, número de alunos, marcador da Minha Lista e selo de novo/atualizado quando aplicável.
+Painel de filtros fixo à esquerda, virando gaveta no celular; grade de cards à direita com contador de resultados sempre visível. **60 cards renderizados por vez, com "mostrar mais"** — 7.000 nós no DOM travam o navegador, e esta solução é mais simples que virtualização.
 
-Página do curso: metadados no topo, ementa em acordeão de capítulos, instrutores, público-alvo, requerimentos e link para a Alura. O vídeo da 1ª aula é exibido apenas se `videoColetadoEm` tiver menos de 7 dias.
+Cada card: título, selo da plataforma, tipo, tema, duração, nível, sinal de qualidade no idioma da sua plataforma, marcador da Minha Lista e selo de novo/atualizado quando aplicável.
 
-## 7. Tratamento de erros
+Página de detalhe: itens do Microsoft Learn mostram resumo, taxonomia e link, já que a API não oferece mais que isso. Itens da Alura mostram ementa em acordeão, instrutores, público-alvo e requisitos. O vídeo da 1ª aula aparece apenas se `videoColetadoEm` tiver menos de 7 dias.
+
+## 10. Tratamento de erros
 
 | Situação | Comportamento |
 |---|---|
-| >5% dos detalhes falham na coleta | Aborta sem escrever em `dados/`; catálogo anterior preservado |
-| Curso descartado na normalização | Registrado no relatório com o motivo; nunca some em silêncio |
+| Uma fonte falha na coleta | Demais fontes atualizam; a que falhou preserva os dados anteriores; `relatorio.json` registra desde quando está desatualizada |
+| >5% dos detalhes da Alura falham | Fonte Alura considerada falha (regra acima) |
+| Tema sem mapeamento | Cai em `outros` **e** entra no relatório; nunca some em silêncio |
+| Item descartado na normalização | Registrado no relatório com o motivo |
 | `index.json` não carrega | Tela de erro com botão "tentar de novo" |
-| Detalhe do curso dá 404 | "Este curso pode ter saído do catálogo" + link para a Alura |
+| `busca.json` não carrega | Catálogo funciona; busca textual permanece desabilitada com aviso |
+| Detalhe da Alura dá 404 | "Este curso pode ter saído do catálogo" + link para a plataforma |
 | localStorage bloqueado (aba anônima) | App funciona; Minha Lista desativada com aviso visível |
-| URL do vídeo expirada | Player ocultado; link para a Alura permanece |
+| URL do vídeo expirada | Player ocultado; link permanece |
 | `novidades.json` ausente (1ª coleta) | Radar explica que a linha de base foi estabelecida |
 
-## 8. Testes
+## 11. Testes
 
 Vitest nos dois lados. **Nenhum teste toca a rede.**
 
-As fixtures são respostas reais gravadas da API, incluindo casos difíceis escolhidos deliberadamente: `nota_disponivel: false`, `categoria: null`, checkpoint, curso substituído, curso sem instrutores.
+Fixtures são respostas reais gravadas das duas APIs, incluindo casos difíceis escolhidos deliberadamente: Alura com `nota_disponivel: false`, `categoria: null`, checkpoint, curso substituído; Microsoft Learn com módulo sem `rating`, trilha com `rating`, item com tema fora do mapa.
 
-Cobertura unitária obrigatória em `normalize`, `build-index` (determinismo), `diff-snapshots`, `filtros` e `minha-lista`. Testes de componente apenas no fluxo principal do catálogo: buscar, filtrar, abrir curso.
+Cobertura unitária obrigatória em cada `normalize`, no mapa de temas, em `build-index` (determinismo), em `diff-snapshots`, nos `filtros` e na `minha-lista`. Um teste específico garante que **ordenação por nota entre plataformas distintas é rejeitada** — é a regra mais fácil de quebrar sem perceber.
+
+Testes de componente apenas no fluxo principal: buscar, filtrar, abrir item.
 
 Desenvolvimento por TDD — teste antes da implementação.
 
-## 9. Ordem de entrega
+## 12. Ordem de entrega
 
-1. Contrato de tipos + coletor com cache em disco → `dados/` gerado localmente
-2. Índice e snapshot determinísticos
-3. **Catálogo com busca, filtros, ordenação e estado na URL** ← já utilizável de verdade
-4. Página de detalhe do curso
-5. Minha Lista + exportar/importar
-6. Radar de novidades
-7. GitHub Action semanal + publicação no GitHub Pages
+1. Contrato de tipos + mapa de temas
+2. **Coletor Microsoft Learn** (uma requisição) → índice real gerado
+3. **Catálogo web: busca, filtros, ordenação, estado na URL** ← já utilizável de verdade
+4. **Coletor Alura** (throttle, cache, detalhes) → segunda fonte no mesmo índice
+5. Página de detalhe
+6. Minha Lista + exportar/importar
+7. Radar de novidades
+8. GitHub Action semanal + publicação no GitHub Pages
 
-Do passo 3 em diante cada etapa é independente: interromper em qualquer ponto deixa um produto funcional.
+O Microsoft Learn vem primeiro porque uma requisição entrega um catálogo inteiro: há produto navegável já no passo 3, antes de investir nas 2.309 requisições da Alura. Do passo 3 em diante cada etapa é independente — interromper em qualquer ponto deixa um produto funcional.
 
-## 10. Fora de escopo
+## 13. Fora de escopo
 
 Deliberadamente excluídos, por não servirem a um catálogo pessoal:
 
 - Autenticação, contas, multiusuário
 - Backend, banco de dados, API própria
-- SEO, renderização no servidor, geração estática por curso
-- Formações e trilhas da Alura — a API não oferece endpoint de listagem funcional
+- SEO, renderização no servidor, geração estática por item
+- Coursera e edX como fontes (motivos na seção 2)
+- Unidades internas dos módulos do Microsoft Learn
 - Sincronização da Minha Lista entre dispositivos (resolvida por exportar/importar)
-- Busca difusa e ranqueamento por relevância — substring simples basta em 2.309 itens
+- Busca difusa e ranqueamento por relevância — substring simples basta em ~7.000 itens
+- Nota unificada ou ranking entre plataformas (seção 5.1)
 - Modo offline / PWA
 
-## 11. Riscos e premissas
+## 14. Riscos e premissas
 
-- **A API pode mudar sem aviso.** Não é versionada nem contratualmente estável. Mitigação: toda a exposição está em `normalize.ts`, e as fixtures detectam regressões.
-- **Não há limite de requisições documentado.** Mitigação: concorrência 4, backoff, frequência semanal, `User-Agent` identificável.
-- **Uso responsável.** Consumo pessoal, semanal, de uma API que a Alura documenta publicamente, com link de retorno para o site deles em cada curso. Se a Alura sinalizar objeção, o projeto para.
+- **A API da Alura pode mudar sem aviso.** Não é versionada nem documentada corretamente. Mitigação: toda a exposição está em `fontes/alura/normalize.ts`, as fixtures detectam regressões, e o isolamento de falhas impede que uma quebra derrube o catálogo.
+- **O Microsoft Learn é estável, mas de escopo restrito.** Cobre o ecossistema Microsoft e áreas adjacentes (IA, dados, segurança, GitHub). Não cobre front-end genérico, design ou UX — é exatamente por isso que a Alura permanece como segunda fonte.
+- **Nenhum limite de requisições documentado em nenhuma das duas.** Mitigação: Microsoft Learn faz uma requisição por semana; Alura usa concorrência 4, backoff e `User-Agent` identificável.
+- **Uso responsável.** Consumo pessoal e semanal de APIs públicas, com link de retorno para a plataforma de origem em cada item. Se qualquer uma das plataformas sinalizar objeção, aquela fonte é removida.
 - **`/api/cursos` como fonte de "disponível agora"** é premissa validada em amostra de 12 cursos, não em toda a base. O coletor registra qualquer curso listado que venha com `showable: false`, para revisão.
+- **O nome do repositório ainda é `alura-catalogo`**, anterior à decisão multi-fonte. Renomear é opcional e não bloqueia nada.
