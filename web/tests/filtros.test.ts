@@ -104,6 +104,21 @@ describe('ordenar', () => {
     expect(ordenar(comNulo, 'duracao').map((i) => i.id)).toEqual(['b', 'a', 'c']);
   });
 
+  it('ordena consistentemente quando ha multiplos itens nulos', () => {
+    const variosNulos = [
+      item({ id: 'a', duracaoMinutos: 90 }),
+      item({ id: 'b', duracaoMinutos: null }),
+      item({ id: 'c', duracaoMinutos: 30 }),
+      item({ id: 'd', duracaoMinutos: null }),
+    ];
+    // Todos os nulos devem ir para o fim, e a ordem entre eles nao importa
+    // (desde que o comparador seja consistente: compare(x, x) === 0)
+    const resultado = ordenar(variosNulos, 'duracao').map((i) => i.id);
+    expect(resultado.slice(0, 2)).toEqual(['c', 'a']);
+    expect(resultado.slice(2)).toContain('b');
+    expect(resultado.slice(2)).toContain('d');
+  });
+
   it('nao muta o array recebido', () => {
     const original = [...itens];
     ordenar(itens, 'titulo');

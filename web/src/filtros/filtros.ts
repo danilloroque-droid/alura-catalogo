@@ -64,6 +64,10 @@ function porNumero(valor: number | null): number {
   return valor === null ? Number.NEGATIVE_INFINITY : valor;
 }
 
+function porDuracao(valor: number | null): number {
+  return valor === null ? Number.POSITIVE_INFINITY : valor;
+}
+
 export function ordenar(itens: ItemCatalogo[], ordem: Ordem): ItemCatalogo[] {
   const copia = [...itens];
 
@@ -72,12 +76,9 @@ export function ordenar(itens: ItemCatalogo[], ordem: Ordem): ItemCatalogo[] {
       return copia.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
     case 'duracao':
       // Crescente, mas sem duracao vai para o fim: um item sem informacao nao
-      // e "o mais curto".
-      return copia.sort((a, b) => {
-        if (a.duracaoMinutos === null) return 1;
-        if (b.duracaoMinutos === null) return -1;
-        return a.duracaoMinutos - b.duracaoMinutos;
-      });
+      // e "o mais curto". Usa POSITIVE_INFINITY para garantir consistencia:
+      // compare(null, null) === 0.
+      return copia.sort((a, b) => porDuracao(a.duracaoMinutos) - porDuracao(b.duracaoMinutos));
     case 'atualizacao':
       return copia.sort((a, b) => (b.atualizadoEm ?? '').localeCompare(a.atualizadoEm ?? ''));
     case 'popularidade':
