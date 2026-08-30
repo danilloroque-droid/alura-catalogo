@@ -58,3 +58,35 @@ describe('construirIndice', () => {
     expect(Object.keys(primeiro)).toHaveLength(19);
   });
 });
+
+describe('invariante valor/escala', () => {
+  const QUANDO = '2026-08-29T00:00:00Z';
+  const constroi = (extra: Partial<ItemCatalogo>) =>
+    () => construirIndice([fonte([item('a', extra)])], QUANDO);
+
+  // O tipo declara valor e escala como campos independentes, entao "os dois ou
+  // nenhum" so vale por convencao. Sem guarda, um normalizador que esquecesse a
+  // escala publicaria um ranking sem sentido em silencio.
+  it('recusa nota sem escala', () => {
+    expect(constroi({ nota: 4.5, escalaNota: null })).toThrow(/a: nota e escalaNota/);
+  });
+
+  it('recusa escala de nota sem nota', () => {
+    expect(constroi({ nota: null, escalaNota: 'ms-rating' })).toThrow(/a: nota e escalaNota/);
+  });
+
+  it('recusa popularidade sem escala', () => {
+    expect(constroi({ popularidade: 0.7, escalaPopularidade: null })).toThrow(/a: popularidade e escalaPopularidade/);
+  });
+
+  it('recusa escala de popularidade sem popularidade', () => {
+    expect(constroi({ popularidade: null, escalaPopularidade: 'ms-popularity' })).toThrow(/a: popularidade e escalaPopularidade/);
+  });
+
+  it('aceita o par completo e o par inteiramente ausente', () => {
+    expect(() => construirIndice([fonte([
+      item('a', { nota: 4.5, escalaNota: 'ms-rating', popularidade: 0.7, escalaPopularidade: 'ms-popularity' }),
+      item('b'),
+    ])], QUANDO)).not.toThrow();
+  });
+});
