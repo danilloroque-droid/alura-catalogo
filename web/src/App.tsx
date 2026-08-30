@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Indice } from '@compartilhado/types';
 import { carregarIndice } from './dados/carregar.js';
+import { Catalogo } from './paginas/Catalogo.js';
 
 export function App() {
   const [indice, setIndice] = useState<Indice | null>(null);
@@ -24,9 +25,15 @@ export function App() {
   if (!indice) return <main><p>Carregando catálogo…</p></main>;
 
   return (
-    <main>
-      <h1>Catálogo de treinamentos</h1>
-      <p>{indice.itens.length} itens disponíveis.</p>
-    </main>
+    <>
+      <header className="topo">
+        <h1>Catálogo de treinamentos</h1>
+        <p>
+          {indice.itens.length} itens · atualizado em{' '}
+          {new Date(indice.geradoEm).toLocaleDateString('pt-BR')}
+        </p>
+      </header>
+      <Catalogo indice={indice} />
+    </>
   );
 }
