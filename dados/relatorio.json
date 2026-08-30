@@ -1,0 +1,24 @@
+{
+  "geradoEm": "2026-08-30T08:43:32.991Z",
+  "fontes": [
+    {
+      "plataforma": "ms-learn",
+      "total": 4667,
+      "descartados": [],
+      "rotulosNaoMapeados": [
+        "blockchain",
+        "business-leader",
+        "game-development",
+        "iot",
+        "mixed-reality",
+        "technical-writer",
+        "microsoft-365-copilot",
+        "azure-machine-learning",
+        "microsoft-foundry",
+        "foundry-tools",
+        "platform-engineer",
+        "azure"
+      ]
+    }
+  ]
+}

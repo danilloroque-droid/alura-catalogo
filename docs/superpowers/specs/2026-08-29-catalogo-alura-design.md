@@ -121,14 +121,17 @@ catalogo-treinamentos/
 │  │  ├─ paginas/          # Catalogo, Item, Radar, MinhaLista
 │  │  └─ componentes/
 │  └─ tests/
-└─ dados/                  # SAÍDA, versionada no git
-   ├─ index.json           # 2,6 MB — exibição e filtros
-   ├─ busca.json           # texto de busca, carregado em segundo plano
-   ├─ detalhes/alura/<slug>.json
-   ├─ snapshots/AAAA-MM-DD.json
-   ├─ novidades.json
-   └─ relatorio.json       # o que foi coletado, descartado e por quê
+├─ dados/                  # SAÍDA publicada pelo site, versionada no git
+│  ├─ index.json           # 4,4 MB — exibição e filtros
+│  ├─ busca.json           # texto de busca, carregado em segundo plano
+│  ├─ detalhes/alura/<slug>.json
+│  ├─ novidades.json
+│  └─ relatorio.json       # o que foi coletado, descartado e por quê
+└─ snapshots/              # histórico para o Radar, FORA do publicDir
+   └─ AAAA-MM-DD.json
 ```
+
+**Por que os snapshots ficam fora de `dados/`.** `dados/` é o `publicDir` do Vite, que copia a pasta inteira para o `dist` sem opção de exclusão. Snapshot guardado ali dentro entraria no deploy a cada build — megabytes por coleta de um arquivo que o site nunca lê — e o custo cresceria a cada semana do Radar. Na raiz, o histórico continua versionado no git e o deploy leva só o que o site usa.
 
 **Por que os dados ficam no git.** Um catálogo pessoal não justifica banco de dados. Commitar dá histórico, diff e rollback de graça, e o Radar de novidades vira a comparação de dois arquivos em vez de uma feature de infraestrutura.
 
@@ -292,7 +295,7 @@ O Radar só produz resultado a partir da **segunda** coleta; a primeira estabele
 
 | Arquivo | Conteúdo | Tamanho |
 |---|---|---|
-| `index.json` | exibição, filtros, título e resumo | 3,01 MB só com Microsoft Learn; ~3,9 MB com a Alura |
+| `index.json` | exibição, filtros, título e resumo | 4,4 MB medidos só com Microsoft Learn (4.667 itens); ~5,3 MB com a Alura |
 | `busca.json` | **apenas o texto extra**: capítulos e seções da ementa da Alura | ~1,0 MB, e **inexistente enquanto a Alura não entrar** |
 
 **Carregamento em duas etapas.** `index.json` chega e o catálogo funciona por completo, incluindo busca textual em títulos e resumos. `busca.json` carrega em segundo plano e **aprofunda** a busca, passando a alcançar o conteúdo das aulas da Alura. Enquanto não chegou, a busca funciona — apenas mais rasa —, e a interface indica discretamente que a busca em ementas ainda está carregando.

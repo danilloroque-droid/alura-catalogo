@@ -1978,6 +1978,7 @@ git commit -m "Adiciona busca, filtros e ordenacao com recusa de nota entre plat
 ```ts
 import { describe, it, expect } from 'vitest';
 import { CRITERIOS_VAZIOS, deHash, paraHash } from '../src/filtros/url.js';
+import type { Criterios } from '../src/filtros/filtros.js';
 
 describe('paraHash', () => {
   it('omite tudo que esta no padrao', () => {
@@ -2022,10 +2023,12 @@ describe('deHash', () => {
   });
 
   it('faz ida e volta sem perder informacao', () => {
-    const original = {
-      ...CRITERIOS_VAZIOS, texto: 'azure devops', plataformas: ['ms-learn'] as const,
-      tipos: ['modulo'] as const, temas: ['devops'], niveis: ['iniciante'] as const,
-      duracaoMaxima: 45, ordem: 'atualizacao' as const,
+    // Anotado como Criterios em vez de `as const`: `as const` produziria
+    // arrays readonly, que nao sao atribuiveis aos campos mutaveis do tipo.
+    const original: Criterios = {
+      texto: 'azure devops', plataformas: ['ms-learn'], tipos: ['modulo'],
+      temas: ['devops'], niveis: ['iniciante'], duracaoMaxima: 45,
+      ordem: 'atualizacao',
     };
     expect(deHash(paraHash(original))).toEqual(original);
   });
